@@ -1,10 +1,12 @@
 import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
+import { soundscape } from '../audio/SoundscapeEngine';
 import { APARTMENTS } from '../data/apartments';
 import { useGameStore } from '../state/useGameStore';
 import { ApartmentId } from '../types/game';
 
 /**
- * Manages the Observer's tripod/handheld telephoto camera at 3rd-floor height across Mercer Courtyard.
+ * Manages the Observer's tripod/handheld telephoto camera at 3rd-floor height across Mercer Courtyard,
+ * including 3D raycast picking, smooth optical zoom, focus plane transitions, and line-of-sight checks.
  */
 export class CameraController {
   public readonly camera: UniversalCamera;
@@ -30,13 +32,14 @@ export class CameraController {
       (e) => {
         e.preventDefault();
         const store = useGameStore.getState();
+        if (store.gameplayMode !== 'observing') return;
         const delta = e.deltaY < 0 ? 0.22 : -0.22;
         store.setZoomLevel(store.zoomLevel + delta);
       },
       { passive: false }
     );
 
-    // Pointer hover & click on window hitboxes
+    // Pointer hover & click on 3D window hitboxes
     scene.onPointerMove = () => {
       const pick = scene.pick(
         scene.pointerX,
@@ -51,6 +54,7 @@ export class CameraController {
 
     scene.onPointerDown = (evt) => {
       if (evt.button !== 0) return;
+      soundscape.init();
       const pick = scene.pick(
         scene.pointerX,
         scene.pointerY,
@@ -63,7 +67,7 @@ export class CameraController {
       }
     };
 
-    // Keyboard controls for pan, zoom, focus ring, and quick apartment selection
+    // Keyboard controls for pan, zoom, focus ring, hold-to-record [R], and Cinematic Mode [H]
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const store = useGameStore.getState();
@@ -72,38 +76,52 @@ export class CameraController {
         case 'escape':
           if (store.gameplayMode !== 'observing') {
             store.setGameplayMode('observing');
+          } else if (store.hudHidden) {
+            store.toggleHudHidden();
           } else {
             this.manualPanOffset.set(0, 0, 0);
             store.focusApartment(null);
           }
           break;
+        case 'h':
+          store.toggleHudHidden();
+          break;
         case ' ':
           e.preventDefault();
           store.togglePause();
           break;
+        case 'r':
+          store.setHoldingRecord(true);
+          {
+            const res = store.collectClueImmediate();
+            if (res.ok && res.clue) {
+              soundscape.playCue('scan_lock');
+            }
+          }
+          break;
         case 'w':
         case 'arrowup':
-          this.manualPanOffset.y = Math.min(5.5, this.manualPanOffset.y + 0.65);
+          this.manualPanOffset.y = Math.min(5.5, this.manualPanOffset.y + 0.55);
           break;
         case 's':
         case 'arrowdown':
-          this.manualPanOffset.y = Math.max(-5.5, this.manualPanOffset.y - 0.65);
+          this.manualPanOffset.y = Math.max(-5.5, this.manualPanOffset.y - 0.55);
           break;
         case 'a':
         case 'arrowleft':
-          this.manualPanOffset.x = Math.max(-6.5, this.manualPanOffset.x - 0.65);
+          this.manualPanOffset.x = Math.max(-6.5, this.manualPanOffset.x - 0.55);
           break;
         case 'd':
         case 'arrowright':
-          this.manualPanOffset.x = Math.min(6.5, this.manualPanOffset.x + 0.65);
+          this.manualPanOffset.x = Math.min(6.5, this.manualPanOffset.x + 0.55);
           break;
         case 'q':
         case '[':
-          store.setFocalDistance(store.focalDistance - 0.5);
+          store.setFocalDistance(store.focalDistance - 0.4);
           break;
         case 'e':
         case ']':
-          store.setFocalDistance(store.focalDistance + 0.5);
+          store.setFocalDistance(store.focalDistance + 0.4);
           break;
         case 'f':
           store.toggleAutoFocus();
@@ -136,6 +154,12 @@ export class CameraController {
           break;
       }
     });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key.toLowerCase() === 'r') {
+        useGameStore.getState().setHoldingRecord(false);
+      }
+    });
   }
 
   public update(deltaSec: number, elapsedSec: number): void {
@@ -148,17 +172,27 @@ export class CameraController {
         apt.worldCenter[1] - 0.15 + this.manualPanOffset.y,
         apt.worldCenter[2] - 0.4
       );
+
+      // Validate 3D line-of-sight: camera pan offset must still frame the apartment window opening
+      const panMagnitude = Math.hypot(this.manualPanOffset.x, this.manualPanOffset.y);
+      const hasClearLOS = panMagnitude <= 1.85;
+      if (store.isLineOfSightClear !== hasClearLOS) {
+        store.setLineOfSightClear(hasClearLOS);
+      }
     } else {
       this.targetLookAt.set(
         0 + this.manualPanOffset.x,
         8.1 + this.manualPanOffset.y,
         1.2
       );
+      if (!store.isLineOfSightClear) {
+        store.setLineOfSightClear(true);
+      }
     }
 
     // Subtle handheld lens breathing when zoomed in (disabled if reducedMotion is enabled)
     if (!store.reducedMotion) {
-      const swayAmp = store.zoomLevel > 1.5 ? 0.045 : 0.015;
+      const swayAmp = store.zoomLevel > 1.5 ? 0.038 : 0.012;
       this.targetLookAt.x += Math.sin(elapsedSec * 1.1) * swayAmp;
       this.targetLookAt.y += Math.cos(elapsedSec * 0.85) * swayAmp;
     }
@@ -166,14 +200,14 @@ export class CameraController {
     Vector3.LerpToRef(
       this.currentLookAt,
       this.targetLookAt,
-      Math.min(1, deltaSec * 6.5),
+      Math.min(1, deltaSec * 7.0),
       this.currentLookAt
     );
     this.camera.setTarget(this.currentLookAt);
 
-    // Map zoomLevel (1.0x -> 3.5x) to FOV (0.78 rad -> 0.21 rad)
+    // Smooth optical zoom interpolation
     const desiredFov = 0.78 / Math.pow(store.zoomLevel, 0.92);
-    this.currentFov += (desiredFov - this.currentFov) * Math.min(1, deltaSec * 8.0);
+    this.currentFov += (desiredFov - this.currentFov) * Math.min(1, deltaSec * 8.5);
     this.camera.fov = this.currentFov;
   }
 }

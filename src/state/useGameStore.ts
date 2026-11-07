@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { APARTMENTS } from '../data/apartments';
-import { DEDUCTION_HYPOTHESES, MYSTERY_CLUES } from '../data/mysteryClues';
+import { MYSTERY_CLUES } from '../data/mysteryClues';
 import { INTERVENTIONS } from '../data/timelineEvents';
 import { SaveDataPayload, SaveSystem } from '../simulation/SaveSystem';
 import {
@@ -31,13 +31,20 @@ export interface SubtitleCue {
   expiresAtMs: number;
 }
 
+const initialDebugMode =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('debug') === '1';
+
 export interface GameStoreState {
-  // FSM & Time
+  // FSM, Mode & Time
   gameplayMode: GameplayMode;
+  debugMode: boolean;
+  hudHidden: boolean;
   night: NightNumber;
   minute: number; // 0 to 180
   timeScale: number; // 0 (paused), 1, 2, 5
   isPaused: boolean;
+  nightTransitionBanner: string | null;
 
   // Camera & Optics
   focusedApartmentId: ApartmentId | null;
@@ -45,12 +52,16 @@ export interface GameStoreState {
   zoomLevel: number; // 1.0x (35mm) to 3.5x (135mm)
   focalDistance: number; // 8.0m to 24.0m
   autoFocusEnabled: boolean;
+  isLineOfSightClear: boolean;
+  isHoldingRecord: boolean;
   activeScanClueId: string | null;
   scanProgress: number; // 0 to 100
+  lastOpticalRejection: string | null;
 
   // Simulation Snapshot
   worldFlags: string[];
   firedEventIds: string[];
+  courtyardAlertness: number;
   residents: Record<ResidentId, ActiveResidentState>;
   apartments: Record<ApartmentId, ActiveApartmentState>;
   visibleClues: ClueDefinition[];
@@ -76,9 +87,12 @@ export interface GameStoreState {
 
   // Actions
   setGameplayMode: (mode: GameplayMode) => void;
+  setDebugMode: (enabled: boolean) => void;
+  toggleHudHidden: () => void;
   tickSimulation: (deltaSeconds: number) => void;
-  setNight: (night: NightNumber) => void;
-  setMinute: (minute: number) => void;
+  setNight: (night: NightNumber) => boolean;
+  setMinute: (minute: number) => boolean;
+  advanceToNextNight: () => { ok: boolean; reason: string };
   setTimeScale: (scale: number) => void;
   togglePause: () => void;
 
@@ -87,9 +101,11 @@ export interface GameStoreState {
   setZoomLevel: (zoom: number) => void;
   setFocalDistance: (meters: number) => void;
   toggleAutoFocus: () => void;
+  setLineOfSightClear: (clear: boolean) => void;
+  setHoldingRecord: (holding: boolean) => void;
 
   stepClueScan: (deltaSeconds: number) => { newlyCollected?: ClueDefinition };
-  collectClueImmediate: (clueId: string) => void;
+  collectClueImmediate: (clueId?: string) => { ok: boolean; reason: string; clue?: ClueDefinition };
   triggerIntervention: (interventionId: InterventionId) => { ok: boolean; message: string };
 
   selectBoardClue: (clueId: string | null) => void;
@@ -114,21 +130,28 @@ const initialSnapshot = SimulationEngine.evaluateSnapshot(1, 10, new Set(), new 
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
   gameplayMode: 'observing',
+  debugMode: initialDebugMode,
+  hudHidden: false,
   night: 1,
-  minute: 10, // Start at 00:10 AM on Night 1 with active room scenes
+  minute: 10,
   timeScale: 1,
   isPaused: false,
+  nightTransitionBanner: null,
 
   focusedApartmentId: null,
   hoveredApartmentId: null,
   zoomLevel: 1.0,
   focalDistance: 19.5,
   autoFocusEnabled: false,
+  isLineOfSightClear: true,
+  isHoldingRecord: false,
   activeScanClueId: null,
   scanProgress: 0,
+  lastOpticalRejection: null,
 
   worldFlags: [],
   firedEventIds: [],
+  courtyardAlertness: 0,
   residents: initialSnapshot.residents,
   apartments: initialSnapshot.apartments,
   visibleClues: initialSnapshot.visibleClues,
@@ -142,51 +165,101 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   activeSubtitles: [
     {
       id: 'init_sub',
-      speakerOrSource: 'MERCER COURTYARD // 00:10 AM',
-      text: 'Rain steady across the rear facade. Select any illuminated window (1A, 2C, 3B, 4A) to zoom in, calibrate focus, and observe.',
+      speakerOrSource: 'NIGHT 1 // 00:10 AM',
+      text: 'Click any window to focus. Scroll to zoom, press [F] to calibrate focus, and hold [R] to record evidence.',
       timestamp: 'NIGHT 1 // 00:10 AM',
-      expiresAtMs: Date.now() + 9000,
+      expiresAtMs: Date.now() + 8000,
     },
   ],
   audioMuted: false,
   qualityPreset: 'high',
   fps: 60,
   frameTimeMs: 16.6,
-  renderBackend: 'WebGL2 / PBR',
+  renderBackend: 'WebGL2 // Filmic PBR',
   subtitlesEnabled: true,
   highContrastUi: false,
   reducedMotion: false,
   hasSavedGame: SaveSystem.hasSaveSlot(),
 
   setGameplayMode: (mode) => {
-    if (mode === 'observing') fsmActor.send({ type: 'RETURN_TO_OBSERVATION' });
-    else if (mode === 'journal_open') fsmActor.send({ type: 'OPEN_JOURNAL' });
-    else if (mode === 'deduction_open') fsmActor.send({ type: 'OPEN_DEDUCTION' });
-    else if (mode === 'settings_open') fsmActor.send({ type: 'OPEN_SETTINGS' });
-    set({ gameplayMode: mode });
+    const state = get();
+    if (mode === state.gameplayMode) return;
+
+    if (mode === 'observing') {
+      const snap = fsmActor.getSnapshot();
+      const restorePaused = snap.context.wasPausedBeforeOverlay;
+      fsmActor.send({ type: 'RETURN_TO_OBSERVATION' });
+      set({ gameplayMode: 'observing', isPaused: restorePaused });
+    } else if (mode === 'journal_open') {
+      fsmActor.send({
+        type: 'OPEN_JOURNAL',
+        currentlyPaused:
+          state.gameplayMode === 'observing'
+            ? state.isPaused
+            : fsmActor.getSnapshot().context.wasPausedBeforeOverlay,
+      });
+      set({ gameplayMode: 'journal_open', isPaused: true });
+    } else if (mode === 'deduction_open') {
+      fsmActor.send({
+        type: 'OPEN_DEDUCTION',
+        currentlyPaused:
+          state.gameplayMode === 'observing'
+            ? state.isPaused
+            : fsmActor.getSnapshot().context.wasPausedBeforeOverlay,
+      });
+      set({ gameplayMode: 'deduction_open', isPaused: true });
+    } else if (mode === 'settings_open') {
+      fsmActor.send({
+        type: 'OPEN_SETTINGS',
+        currentlyPaused:
+          state.gameplayMode === 'observing'
+            ? state.isPaused
+            : fsmActor.getSnapshot().context.wasPausedBeforeOverlay,
+      });
+      set({ gameplayMode: 'settings_open', isPaused: true });
+    } else {
+      set({ gameplayMode: mode });
+    }
   },
+
+  setDebugMode: (enabled) => set({ debugMode: enabled }),
+
+  toggleHudHidden: () => set((s) => ({ hudHidden: !s.hudHidden })),
 
   tickSimulation: (deltaSeconds) => {
     const state = get();
     const now = Date.now();
     const filteredSubs = state.activeSubtitles.filter((s) => s.expiresAtMs > now);
 
+    const effectivelyPaused =
+      state.isPaused || state.gameplayMode !== 'observing';
+
     const { nextMinute, reachedEndOfNight } = WorldClock.stepClock(
       state.minute,
       deltaSeconds,
       state.timeScale,
-      state.isPaused || state.gameplayMode === 'case_resolved'
+      effectivelyPaused
     );
 
     let nextNight = state.night;
     let finalMinute = nextMinute;
+    let nextTimeScale = state.timeScale;
+    let nextIsPaused = state.isPaused;
+    let nextBanner = state.nightTransitionBanner;
 
-    // Automatically roll over from 03:00 AM to next night if not on Night 3
-    if (reachedEndOfNight && !state.isPaused) {
+    // Natural progression at 03:00 AM
+    if (reachedEndOfNight && !effectivelyPaused) {
       if (state.night < 3) {
         nextNight = (state.night + 1) as NightNumber;
         finalMinute = 0;
+        nextTimeScale = 1;
         fsmActor.send({ type: 'ADVANCE_NIGHT', night: nextNight });
+        nextBanner = `NIGHT ${nextNight} // 00:00 AM`;
+      } else {
+        // End of Night 3 at 03:00 AM: pause and prompt final deduction
+        finalMinute = WorldClock.MAX_MINUTES;
+        nextIsPaused = true;
+        nextTimeScale = 1;
       }
     }
 
@@ -200,67 +273,155 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       for (const f of evt.setsFlags) {
         flagSet.add(f);
       }
+      // Never allow fast-forward to silently bypass decision points
+      if (evt.isDecisionPoint && nextTimeScale > 1) {
+        nextTimeScale = 1;
+      }
       newSubs.push({
         id: `${evt.id}_${now}`,
         speakerOrSource: `${APARTMENTS[evt.sourceApartmentId].code} // ${evt.title.toUpperCase()}`,
         text: evt.subtitle,
         timestamp: WorldClock.formatTimestamp(nextNight, finalMinute),
-        expiresAtMs: now + 8500,
+        expiresAtMs: now + 7500,
       });
     }
 
     set({
       night: nextNight,
       minute: finalMinute,
+      timeScale: nextTimeScale,
+      isPaused: nextIsPaused,
+      nightTransitionBanner: nextBanner,
       worldFlags: Array.from(flagSet),
       firedEventIds: Array.from(firedSet),
       residents: snapshot.residents,
       apartments: snapshot.apartments,
       visibleClues: snapshot.visibleClues,
-      activeSubtitles: newSubs.slice(-3),
+      activeSubtitles: newSubs.slice(-2),
     });
   },
 
+  /**
+   * Direct night switching is restricted to debugMode.
+   * Normal gameplay must use natural clock rollover or advanceToNextNight().
+   */
   setNight: (night) => {
     const state = get();
+    if (!state.debugMode) {
+      return false;
+    }
     fsmActor.send({ type: 'ADVANCE_NIGHT', night });
+    const reconstructed = SimulationEngine.reconstructChronologyState(
+      night,
+      10,
+      state.worldFlags
+    );
     const snapshot = SimulationEngine.evaluateSnapshot(
       night,
       10,
-      new Set(state.worldFlags),
-      new Set(state.firedEventIds)
+      reconstructed.flags,
+      reconstructed.firedEventIds
     );
     set({
       night,
       minute: 10,
+      worldFlags: Array.from(reconstructed.flags),
+      firedEventIds: Array.from(reconstructed.firedEventIds),
       residents: snapshot.residents,
       apartments: snapshot.apartments,
       visibleClues: snapshot.visibleClues,
     });
-    get().pushSubtitle(
-      `NIGHT ${night} LOG`,
-      `Switched observation reel to Night ${night} (00:10 AM).`
-    );
+    return true;
   },
 
+  /**
+   * Direct timeline scrubbing is restricted to debugMode.
+   * Reconstructs consistent chronological flags when rewinding or jumping.
+   */
   setMinute: (minute) => {
-    const clamped = Math.max(0, Math.min(WorldClock.MAX_MINUTES, minute));
     const state = get();
-    const flagSet = new Set(state.worldFlags);
-    const firedSet = new Set(state.firedEventIds);
-    const snapshot = SimulationEngine.evaluateSnapshot(state.night, clamped, flagSet, firedSet);
-    for (const evt of snapshot.newlyTriggeredEvents) {
-      firedSet.add(evt.id);
-      evt.setsFlags.forEach((f) => flagSet.add(f));
+    if (!state.debugMode) {
+      return false;
     }
+    const clamped = Math.max(0, Math.min(WorldClock.MAX_MINUTES, minute));
+    const reconstructed = SimulationEngine.reconstructChronologyState(
+      state.night,
+      clamped,
+      state.worldFlags
+    );
+    const snapshot = SimulationEngine.evaluateSnapshot(
+      state.night,
+      clamped,
+      reconstructed.flags,
+      reconstructed.firedEventIds
+    );
     set({
       minute: clamped,
-      worldFlags: Array.from(flagSet),
-      firedEventIds: Array.from(firedSet),
+      worldFlags: Array.from(reconstructed.flags),
+      firedEventIds: Array.from(reconstructed.firedEventIds),
       residents: snapshot.residents,
       apartments: snapshot.apartments,
       visibleClues: snapshot.visibleClues,
     });
+    return true;
+  },
+
+  /**
+   * Allows the player to conclude the current night watch once the night has reached 02:15 AM (135m)
+   * or after collecting at least 2 clues from the current night, advancing naturally to the next night.
+   */
+  advanceToNextNight: () => {
+    const state = get();
+    if (state.night >= 3) {
+      return {
+        ok: false,
+        reason: 'Final night in progress — open Deduction Board to submit verdict.',
+      };
+    }
+
+    const cluesThisNight = state.collectedClues.filter(
+      (c) => c.collectedAtNight === state.night
+    ).length;
+
+    if (state.minute < 135 && cluesThisNight < 2) {
+      return {
+        ok: false,
+        reason: 'Continue observing until 02:15 AM or record at least 2 observations tonight.',
+      };
+    }
+
+    const nextNight = (state.night + 1) as NightNumber;
+    fsmActor.send({ type: 'ADVANCE_NIGHT', night: nextNight });
+    // Ensure all events from the concluded night have their flags committed
+    const endOfCurrentNight = SimulationEngine.reconstructChronologyState(
+      state.night,
+      180,
+      state.worldFlags
+    );
+    const snapshot = SimulationEngine.evaluateSnapshot(
+      nextNight,
+      10,
+      endOfCurrentNight.flags,
+      endOfCurrentNight.firedEventIds
+    );
+
+    set({
+      night: nextNight,
+      minute: 10,
+      timeScale: 1,
+      worldFlags: Array.from(endOfCurrentNight.flags),
+      firedEventIds: Array.from(endOfCurrentNight.firedEventIds),
+      residents: snapshot.residents,
+      apartments: snapshot.apartments,
+      visibleClues: snapshot.visibleClues,
+      nightTransitionBanner: `NIGHT ${nextNight} // 00:10 AM`,
+    });
+
+    get().pushSubtitle(
+      `NIGHT ${nextNight} WATCH`,
+      `Concluded Night ${state.night} log. Beginning Night ${nextNight} surveillance.`
+    );
+    return { ok: true, reason: `Advanced to Night ${nextNight}` };
   },
 
   setTimeScale: (scale) => set({ timeScale: scale, isPaused: scale === 0 }),
@@ -274,16 +435,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         zoomLevel: 1.0,
         scanProgress: 0,
         activeScanClueId: null,
+        lastOpticalRejection: null,
       });
       return;
     }
     const apt = APARTMENTS[aptId];
     set((state) => ({
       focusedApartmentId: aptId,
-      zoomLevel: Math.max(state.zoomLevel, 2.4),
+      zoomLevel: Math.max(state.zoomLevel, 2.2),
       focalDistance: state.autoFocusEnabled ? apt.focalDepthMeters : state.focalDistance,
       scanProgress: 0,
       activeScanClueId: null,
+      lastOpticalRejection: null,
     }));
   },
 
@@ -310,11 +473,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
 
+  setLineOfSightClear: (clear) => set({ isLineOfSightClear: clear }),
+
+  setHoldingRecord: (holding) => set({ isHoldingRecord: holding }),
+
   stepClueScan: (deltaSeconds) => {
     const state = get();
     const collectedSet = new Set(state.collectedClues.map((c) => c.clueId));
 
-    // Find an uncollected visible clue in the focused apartment
     const candidate = state.visibleClues.find(
       (c) => c.apartmentId === state.focusedApartmentId && !collectedSet.has(c.id)
     );
@@ -326,22 +492,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return {};
     }
 
-    const check = SimulationEngine.checkClueOpticalConditions(
-      candidate,
-      state.focusedApartmentId,
-      state.zoomLevel,
-      state.focalDistance
-    );
+    const check = SimulationEngine.validateEvidenceCollection(candidate, {
+      night: state.night,
+      minute: state.minute,
+      focusedApartmentId: state.focusedApartmentId,
+      currentZoom: state.zoomLevel,
+      currentFocalDistance: state.focalDistance,
+      worldFlags: new Set(state.worldFlags),
+      apartments: state.apartments,
+      isLineOfSightClear: state.isLineOfSightClear,
+    });
 
     if (!check.canScan) {
       set({
         activeScanClueId: candidate.id,
-        scanProgress: Math.max(0, state.scanProgress - deltaSeconds * 35),
+        scanProgress: Math.max(0, state.scanProgress - deltaSeconds * 40),
       });
       return {};
     }
 
-    const nextProgress = Math.min(100, state.scanProgress + deltaSeconds * 75);
+    // Optical lock achieved: require holding [R] or Record button so looking alone does not auto-collect
+    if (!state.isHoldingRecord) {
+      set({
+        activeScanClueId: candidate.id,
+        scanProgress: Math.max(0, state.scanProgress - deltaSeconds * 30),
+      });
+      return {};
+    }
+
+    const fillRate = 135;
+    const nextProgress = Math.min(100, state.scanProgress + deltaSeconds * fillRate);
+
     if (nextProgress >= 100) {
       const record: CollectedClueRecord = {
         clueId: candidate.id,
@@ -353,10 +534,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         collectedClues: [...state.collectedClues, record],
         scanProgress: 0,
         activeScanClueId: null,
+        lastOpticalRejection: null,
       });
       get().pushSubtitle(
-        `EVIDENCE LOGGED [${APARTMENTS[candidate.apartmentId].code}]`,
-        `${candidate.title} — recorded in Observation Journal.`
+        `OBSERVATION RECORDED [${APARTMENTS[candidate.apartmentId].code}]`,
+        `${candidate.title}`
       );
       return { newlyCollected: candidate };
     }
@@ -365,27 +547,66 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return {};
   },
 
+  /**
+   * Strictly validates all 6 observation requirements before recording a clue.
+   * Cannot be used to bypass apartment, time, visibility, line-of-sight, optical clarity, or event prerequisites.
+   */
   collectClueImmediate: (clueId) => {
     const state = get();
-    if (state.collectedClues.some((c) => c.clueId === clueId)) return;
-    const clue = MYSTERY_CLUES.find((c) => c.id === clueId);
-    if (!clue) return;
+    const collectedSet = new Set(state.collectedClues.map((c) => c.clueId));
+
+    const targetClue = clueId
+      ? MYSTERY_CLUES.find((c) => c.id === clueId)
+      : state.visibleClues.find(
+          (c) => c.apartmentId === state.focusedApartmentId && !collectedSet.has(c.id)
+        );
+
+    if (!targetClue) {
+      const reason = 'No observable evidence at current focus and timestamp';
+      set({ lastOpticalRejection: reason });
+      return { ok: false, reason };
+    }
+
+    if (collectedSet.has(targetClue.id)) {
+      return { ok: true, reason: 'Evidence already recorded', clue: targetClue };
+    }
+
+    const validation = SimulationEngine.validateEvidenceCollection(targetClue, {
+      night: state.night,
+      minute: state.minute,
+      focusedApartmentId: state.focusedApartmentId,
+      currentZoom: state.zoomLevel,
+      currentFocalDistance: state.focalDistance,
+      worldFlags: new Set(state.worldFlags),
+      apartments: state.apartments,
+      isLineOfSightClear: state.isLineOfSightClear,
+    });
+
+    if (!validation.canScan) {
+      set({ lastOpticalRejection: validation.reason });
+      return { ok: false, reason: validation.reason };
+    }
 
     const record: CollectedClueRecord = {
-      clueId: clue.id,
+      clueId: targetClue.id,
       collectedAtNight: state.night,
       collectedAtMinute: Math.floor(state.minute),
       formattedTimestamp: WorldClock.formatTimestamp(state.night, state.minute),
     };
+
     set({
       collectedClues: [...state.collectedClues, record],
       scanProgress: 0,
       activeScanClueId: null,
+      lastOpticalRejection: null,
     });
+
     get().pushSubtitle(
-      `EVIDENCE LOGGED [${APARTMENTS[clue.apartmentId].code}]`,
-      `${clue.title} — added to Journal & Deduction Board.`
+      `OBSERVATION RECORDED [${APARTMENTS[targetClue.apartmentId].code}]`,
+      `${targetClue.title}`
     );
+
+    return { ok: true, reason: 'Evidence recorded', clue: targetClue };
   },
 
   triggerIntervention: (interventionId) => {
@@ -393,17 +614,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const def = INTERVENTIONS.find((i) => i.id === interventionId);
     if (!def) return { ok: false, message: 'Invalid intervention' };
 
+    const collectedSet = new Set(state.collectedClues.map((c) => c.clueId));
     const check = SimulationEngine.canTriggerIntervention(
       interventionId,
       state.night,
       state.minute,
-      new Set(state.worldFlags)
+      new Set(state.worldFlags),
+      collectedSet,
+      state.courtyardAlertness
     );
     if (!check.allowed) {
       return { ok: false, message: check.reason };
     }
 
     const nextFlags = Array.from(new Set([...state.worldFlags, def.setsFlag]));
+    const nextAlertness = state.courtyardAlertness + def.alertnessCost;
     const snapshot = SimulationEngine.evaluateSnapshot(
       state.night,
       state.minute,
@@ -413,6 +638,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set({
       worldFlags: nextFlags,
+      courtyardAlertness: nextAlertness,
       residents: snapshot.residents,
       apartments: snapshot.apartments,
       visibleClues: snapshot.visibleClues,
@@ -429,12 +655,22 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (clueA === clueB) {
       return { ok: false, message: 'Select two distinct pieces of evidence to synthesize.' };
     }
+
+    const state = get();
+    const collectedSet = new Set(state.collectedClues.map((c) => c.clueId));
+    if (!collectedSet.has(clueA) || !collectedSet.has(clueB)) {
+      return {
+        ok: false,
+        message: 'Both evidence pins must be observed and recorded before linking.',
+      };
+    }
+
     const hyp = SimulationEngine.findHypothesisByCluePair(clueA, clueB);
     if (!hyp) {
       set({
         selectedBoardClueId: null,
         lastDeductionFeedback:
-          'No direct causal link between those two observations. Check timestamps and apartment connections.',
+          'INCONCLUSIVE LINK: Those two observations do not establish a direct causal connection.',
       });
       return {
         ok: false,
@@ -442,7 +678,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       };
     }
 
-    const state = get();
     if (state.unlockedHypothesisIds.includes(hyp.id)) {
       set({
         selectedBoardClueId: null,
@@ -463,7 +698,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   submitFinalVerdict: () => {
     const state = get();
-    const ending = SimulationEngine.resolveEnding(state.unlockedHypothesisIds);
+    const collectedSet = new Set(state.collectedClues.map((c) => c.clueId));
+    const ending = SimulationEngine.resolveEnding(
+      state.unlockedHypothesisIds,
+      collectedSet
+    );
     fsmActor.send({ type: 'RESOLVE_CASE', endingId: ending.id });
     set({
       gameplayMode: 'case_resolved',
@@ -480,9 +719,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       speakerOrSource,
       text,
       timestamp: WorldClock.formatTimestamp(state.night, state.minute),
-      expiresAtMs: Date.now() + 8000,
+      expiresAtMs: Date.now() + 7000,
     };
-    set({ activeSubtitles: [...state.activeSubtitles.slice(-2), cue] });
+    set({ activeSubtitles: [...state.activeSubtitles.slice(-1), cue] });
   },
 
   setQualityPreset: (preset) => set({ qualityPreset: preset }),
@@ -509,6 +748,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       firedEventIds: state.firedEventIds,
       collectedClues: state.collectedClues,
       unlockedHypothesisIds: state.unlockedHypothesisIds,
+      courtyardAlertness: state.courtyardAlertness,
       qualityPreset: state.qualityPreset,
       subtitlesEnabled: state.subtitlesEnabled,
       highContrastUi: state.highContrastUi,
@@ -517,7 +757,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const ok = SaveSystem.saveToLocalStorage(payload);
     if (ok) {
       set({ hasSavedGame: true });
-      get().pushSubtitle('SYSTEM', 'Investigation state saved to local storage.');
+      get().pushSubtitle('SYSTEM', 'Investigation state saved.');
     }
     return ok;
   },
@@ -525,6 +765,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   loadGame: () => {
     const data = SaveSystem.loadFromLocalStorage();
     if (!data) return false;
+    fsmActor.send({ type: 'ADVANCE_NIGHT', night: data.night });
     const snapshot = SimulationEngine.evaluateSnapshot(
       data.night,
       data.minute,
@@ -536,6 +777,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       minute: data.minute,
       worldFlags: data.worldFlags,
       firedEventIds: data.firedEventIds,
+      courtyardAlertness: data.courtyardAlertness ?? 0,
       collectedClues: data.collectedClues,
       unlockedHypothesisIds: data.unlockedHypothesisIds,
       qualityPreset: data.qualityPreset,
@@ -547,13 +789,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       visibleClues: snapshot.visibleClues,
       gameplayMode: 'observing',
       resolvedEnding: null,
+      isPaused: false,
     });
     get().pushSubtitle('SYSTEM', `Loaded saved investigation (Night ${data.night}).`);
     return true;
   },
 
   resetInvestigation: () => {
-    SaveSystem.clearSaveSlot();
     fsmActor.send({ type: 'RESET_INVESTIGATION' });
     const snap = SimulationEngine.evaluateSnapshot(1, 10, new Set(), new Set());
     set({
@@ -562,11 +804,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       minute: 10,
       timeScale: 1,
       isPaused: false,
+      nightTransitionBanner: null,
       focusedApartmentId: null,
       zoomLevel: 1.0,
       focalDistance: 19.5,
+      isLineOfSightClear: true,
+      isHoldingRecord: false,
+      lastOpticalRejection: null,
       worldFlags: [],
       firedEventIds: [],
+      courtyardAlertness: 0,
       residents: snap.residents,
       apartments: snap.apartments,
       visibleClues: snap.visibleClues,
@@ -575,7 +822,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       selectedBoardClueId: null,
       lastDeductionFeedback: null,
       resolvedEnding: null,
-      hasSavedGame: false,
+      hasSavedGame: SaveSystem.hasSaveSlot(),
     });
     get().pushSubtitle('SYSTEM', 'Investigation reset to Night 1 // 00:10 AM.');
   },

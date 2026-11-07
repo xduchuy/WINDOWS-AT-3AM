@@ -14,9 +14,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     targetFocalDistance: 20.2,
     isMisleadingAssumption: true,
     contradictedByClueId: 'clue_n2_bailment_3b',
+    confidence: 'circumstantial',
+    witnessOrObject: 'Julian Vance & Recessed Wall Safe (Apt 4A)',
+    relatedClueIds: ['clue_n1_missing_master_key', 'clue_n2_bailment_3b'],
+    opticalHintPrompt: 'Figure at rear wall safe in 4A — calibrate focus (~20.2m) & zoom (2.1x+)',
     description:
-      'Julian Vance conceals a crimson violin case inside his wall safe behind a portrait. At first glance, this looks like Julian hiding an unrecorded instrument for an inside-job insurance fraud.',
-    deductionTag: 'Suspect: Julian Hiding Case',
+      'Julian Vance conceals a crimson violin case inside his wall safe behind a portrait. In isolation, this appears circumstantial—as though Julian is hiding an instrument off-the-books.',
+    deductionTag: 'Obs 4A: Case Locked in Wall Safe',
     localOffset: [1.15, 0.3, 1.2],
   },
   {
@@ -29,9 +33,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 65,
     minZoomLevel: 2.2,
     targetFocalDistance: 20.1,
+    confidence: 'confirmed',
+    witnessOrObject: 'Nora Lin & Yellow Stationery Sheet (Apt 1A)',
+    relatedClueIds: ['clue_n1_missing_master_key', 'clue_n2_breaker_sabotage_1a', 'clue_n3_burning_extortion_2c'],
+    opticalHintPrompt: 'Yellow document on 1A counter — calibrate focus (~20.1m) & zoom (2.2x+)',
     description:
-      'On Nora Lin’s kitchen counter lies a typed demand on yellow Lloyd-Mercer audit stationery coercing her to hand over the 4A master key and cut the 4th-floor power at 01:25 AM on Night 2.',
-    deductionTag: 'Coercion: 1A Extorted on Audit Paper',
+      'On Nora Lin’s kitchen counter lies a typed demand on yellow Lloyd-Mercer audit stationery coercing her to surrender the 4A master key and cut 4th-floor power at 01:25 AM on Night 2.',
+    deductionTag: 'Doc 1A: Yellow Audit Extortion Note',
     localOffset: [0.35, 0.1, 0.05],
   },
   {
@@ -44,9 +52,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 125,
     minZoomLevel: 2.2,
     targetFocalDistance: 20.1,
+    confidence: 'ambiguous',
+    witnessOrObject: 'Master Key Rack Hook #4A (Apt 1A)',
+    relatedClueIds: ['clue_n1_extortion_note_1a', 'clue_n1_payphone_keytag'],
+    opticalHintPrompt: 'Activity at 1A key rack on rear wall — calibrate focus (~20.1m) & zoom (2.2x+)',
     description:
-      'Nora Lin removes the brass master key tagged "4A - VANCE" from the ground-floor superintendent board and seals it in an envelope.',
-    deductionTag: 'Access: 1A Master Key Removed',
+      'Nora Lin unhooks the brass master key tagged "4A - VANCE" from the superintendent board and seals it in an envelope. Without context, her motive appears ambiguous.',
+    deductionTag: 'Act 1A: 4A Master Key Removed',
     localOffset: [0.85, 0.35, 1.3],
   },
   {
@@ -59,14 +71,18 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 65,
     minZoomLevel: 2.2,
     targetFocalDistance: 19.6,
+    confidence: 'confirmed',
+    witnessOrObject: 'Marcus Thorne & Customs Manifest (Apt 2C)',
+    relatedClueIds: ['clue_n2_vent_stash_2c', 'clue_n2_heist_in_4a'],
+    opticalHintPrompt: 'Stamped shipping papers on 2C table — calibrate focus (~19.6m) & zoom (2.2x+)',
     description:
-      'Marcus Thorne stamps a diplomatic cargo manifest in Apt 2C scheduling a "Cremona String Instrument" for export on a freighter leaving Pier 14 after Night 3.',
-    deductionTag: 'Motive: Marcus Smuggling Manifest',
+      'Marcus Thorne stamps a diplomatic cargo manifest in Apt 2C scheduling a "Cremona String Instrument" for export on a freighter departing Pier 14 after Night 3.',
+    deductionTag: 'Doc 2C: Pier 14 Smuggling Manifest',
     localOffset: [-0.45, 0.1, 0.1],
   },
   {
     id: 'clue_n1_payphone_keytag',
-    title: 'Dropped "4A" Brass Key Tag in 2C (Intervention)',
+    title: 'Dropped "4A" Brass Key Tag in 2C',
     category: 'cross_apartment',
     night: 1,
     apartmentId: 'apt_2c',
@@ -75,9 +91,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     minZoomLevel: 2.3,
     targetFocalDistance: 19.6,
     requiredFlags: ['flag_payphone_rung'],
+    confidence: 'confirmed',
+    witnessOrObject: 'Brass Key Tag Stamped "SUPER 4A" (Apt 2C)',
+    relatedClueIds: ['clue_n1_missing_master_key', 'clue_n2_heist_in_4a'],
+    opticalHintPrompt: 'Metallic object dropped near 2C window — calibrate focus (~19.6m) & zoom (2.3x+)',
     description:
-      'Startled by your courtyard payphone ring, Marcus knocks a brass key tag stamped "SUPER 4A" under his table lamp—proving he received the master key from 1A.',
-    deductionTag: 'Link: Marcus Holds 4A Master Key',
+      'Startled by the courtyard payphone ring, Marcus knocks a brass key tag stamped "SUPER 4A" into the light—proving he received the master key from 1A.',
+    deductionTag: 'Prop 2C: Dropped 4A Master Key Tag',
     localOffset: [0.0, 0.05, -0.95],
   },
 
@@ -92,9 +112,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 130,
     minZoomLevel: 2.1,
     targetFocalDistance: 18.8,
+    confidence: 'confirmed',
+    witnessOrObject: 'Julian Vance, Elena Rostova & Vault Receipt (Apt 3B)',
+    relatedClueIds: ['clue_n1_safe_deposit', 'clue_n3_uv_decoy_stamp'],
+    opticalHintPrompt: 'Two residents meeting by 3B archival shelf — calibrate focus (~18.8m) & zoom (2.1x+)',
     description:
-      'Before the blackout, Julian Vance delivers the real 1714 Orpheus violin wrapped in oilskin to investigator Elena Rostova in 3B and signs a witnessed safekeeping receipt.',
-    deductionTag: 'Alibi: Real Violin Safely in 3B Vault',
+      'Before the blackout, Julian Vance delivers the authentic 1714 Orpheus violin wrapped in oilskin to investigator Elena Rostova in 3B and signs a witnessed safekeeping receipt.',
+    deductionTag: 'Alibi 3B: Real Violin Sealed in Vault',
     localOffset: [-1.15, 0.35, 0.8],
   },
   {
@@ -107,9 +131,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 132,
     minZoomLevel: 2.1,
     targetFocalDistance: 20.1,
+    confidence: 'confirmed',
+    witnessOrObject: 'Master Breaker Panel & Maintenance Logbook (Apt 1A)',
+    relatedClueIds: ['clue_n1_extortion_note_1a', 'clue_n2_heist_in_4a'],
+    opticalHintPrompt: 'Sparks at 1A breaker panel on left wall — calibrate focus (~20.1m) & zoom (2.1x+)',
     description:
-      'Nora Lin pulls the red-taped 4th-floor breaker lever in 1A, cutting power to 4A while writing "COERCED BY 2C AUDITOR" inside the maintenance logbook.',
-    deductionTag: 'Sabotage: 1A Cut Power Under Duress',
+      'Nora Lin pulls the red-taped 4th-floor breaker lever in 1A, cutting power to 4A while recording "COERCED BY 2C AUDITOR" inside the maintenance logbook.',
+    deductionTag: 'Act 1A: Coerced 4th-Floor Breaker Cut',
     localOffset: [-1.2, 0.35, 0.85],
   },
   {
@@ -122,9 +150,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 130,
     minZoomLevel: 2.3,
     targetFocalDistance: 20.2,
+    confidence: 'confirmed',
+    witnessOrObject: 'Marcus Thorne in Darkened Workshop (Apt 4A)',
+    relatedClueIds: ['clue_n2_breaker_sabotage_1a', 'clue_n2_vent_stash_2c'],
+    opticalHintPrompt: 'Penlight beam inside darkened 4A safe — calibrate focus (~20.2m) & zoom (2.3x+)',
     description:
       'During the 4th-floor blackout, Marcus Thorne enters 4A with a penlight and uses the master key to steal the crimson violin case from Julian’s safe.',
-    deductionTag: 'Act: Marcus Burglarized 4A Safe',
+    deductionTag: 'Act 4A: Marcus Burglarizes Safe in Dark',
     localOffset: [1.1, 0.25, 1.25],
   },
   {
@@ -137,14 +169,18 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 180,
     minZoomLevel: 2.2,
     targetFocalDistance: 19.6,
+    confidence: 'confirmed',
+    witnessOrObject: 'False Wall Vent & Stolen Crimson Case (Apt 2C)',
+    relatedClueIds: ['clue_n1_forged_manifest_2c', 'clue_n2_heist_in_4a', 'clue_n3_uv_decoy_stamp'],
+    opticalHintPrompt: 'Figure crouching by 2C rear ventilation grille — calibrate focus (~19.6m) & zoom (2.2x+)',
     description:
       'Immediately after returning from the darkened 4th floor, Marcus unscrews the false air vent in 2C and conceals the stolen crimson violin case inside the wall cavity.',
-    deductionTag: 'Possession: Stolen Case Hidden in 2C',
+    deductionTag: 'Prop 2C: Stolen Case Hidden in Vent',
     localOffset: [-1.25, 0.1, 1.35],
   },
   {
     id: 'clue_n2_elena_ledger_signal',
-    title: 'Elena’s Wire-Transfer & Extortion Chart in 3B (Intervention)',
+    title: 'Elena’s Wire-Transfer & Extortion Chart in 3B',
     category: 'cross_apartment',
     night: 2,
     apartmentId: 'apt_3b',
@@ -153,9 +189,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     minZoomLevel: 2.2,
     targetFocalDistance: 18.8,
     requiredFlags: ['flag_laser_signal_3b'],
+    confidence: 'confirmed',
+    witnessOrObject: 'Elena Rostova’s Forensic Ledger Chart (Apt 3B)',
+    relatedClueIds: ['clue_n2_bailment_3b', 'clue_n1_forged_manifest_2c'],
+    opticalHintPrompt: 'Chart held against 3B window glass — calibrate focus (~18.8m) & zoom (2.2x+)',
     description:
       'In response to your optical viewfinder ping, Elena holds up a forensic chart connecting Marcus Thorne’s gambling debts to three staged Lloyd-Mercer vault thefts.',
-    deductionTag: 'Pattern: Auditor Fraud Ring Confirmed',
+    deductionTag: 'Doc 3B: Auditor Fraud Ring Chart',
     localOffset: [0.0, 0.2, -1.0],
   },
 
@@ -170,14 +210,18 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 90,
     minZoomLevel: 2.2,
     targetFocalDistance: 19.6,
+    confidence: 'confirmed',
+    witnessOrObject: 'UV-Stamped Decoy Violin in 2C (Apt 2C)',
+    relatedClueIds: ['clue_n2_bailment_3b', 'clue_n2_vent_stash_2c'],
+    opticalHintPrompt: 'Ultraviolet glow inside open case on 2C table — calibrate focus (~19.6m) & zoom (2.2x+)',
     description:
       'When Marcus inspects the stolen violin in 2C under ultraviolet light, Julian’s fluorescent stamp glows inside the lid—proving Julian anticipated the theft and baited the safe with a replica.',
-    deductionTag: 'Sting: Stolen Violin is Julian’s Decoy',
+    deductionTag: 'Prop 2C: Stolen Violin is UV Decoy',
     localOffset: [-0.45, 0.2, 0.1],
   },
   {
     id: 'clue_n3_burning_extortion_2c',
-    title: 'Marcus Burning Yellow Extortion Carbons Over Stove (Intervention)',
+    title: 'Marcus Burning Yellow Extortion Carbons Over Stove',
     category: 'resident_action',
     night: 3,
     apartmentId: 'apt_2c',
@@ -186,9 +230,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     minZoomLevel: 2.2,
     targetFocalDistance: 19.6,
     requiredFlags: ['flag_alley_breaker_pulsed'],
+    confidence: 'confirmed',
+    witnessOrObject: 'Charred Yellow Audit Carbons at Galley Stove (Apt 2C)',
+    relatedClueIds: ['clue_n1_extortion_note_1a', 'clue_n3_joint_testimony_1a'],
+    opticalHintPrompt: 'Flame flare at 2C galley stove — calibrate focus (~19.6m) & zoom (2.2x+)',
     description:
       'Panicked by the courtyard surge bell, Marcus burns the yellow audit carbon copies matching the extortion note found in Nora Lin’s kitchen.',
-    deductionTag: 'Proof: Marcus Authored 1A Extortion',
+    deductionTag: 'Act 2C: Marcus Burning Extortion Carbons',
     localOffset: [1.05, 0.25, 0.6],
   },
   {
@@ -201,9 +249,13 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
     maxMinute: 180,
     minZoomLevel: 2.1,
     targetFocalDistance: 20.1,
+    confidence: 'confirmed',
+    witnessOrObject: 'Julian Vance & Nora Lin (Apt 1A)',
+    relatedClueIds: ['clue_n1_extortion_note_1a', 'clue_n2_breaker_sabotage_1a'],
+    opticalHintPrompt: 'Two tenants comparing ledgers in 1A — calibrate focus (~20.1m) & zoom (2.1x+)',
     description:
       'In Apt 1A, Nora shows Julian Vance the coerced key log and Marcus’s yellow demand note, proving she acted under duress and confirming Marcus as the mastermind.',
-    deductionTag: 'Corroboration: 1A & 4A Unite Against 2C',
+    deductionTag: 'Testimony 1A: 1A & 4A Reconcile Evidence',
     localOffset: [0.8, 0.25, 1.2],
   },
 ];
@@ -211,34 +263,37 @@ export const MYSTERY_CLUES: ClueDefinition[] = [
 export const DEDUCTION_HYPOTHESES: DeductionHypothesis[] = [
   {
     id: 'hyp_misleading_julian_inside_job',
-    title: 'Fallacy: Julian Vance Staged an Inside-Job Theft',
+    title: 'Unproven Assumption: Julian Vance Staged an Inside-Job Theft',
     claim:
-      'Julian locked the crimson violin case in his 4A safe on Night 1 to fake its disappearance and collect the restoration insurance himself.',
+      'Julian locked the crimson violin case in his 4A safe on Night 1 while the 4A master key was removed in 1A—suggesting Julian and Nora colluded to fake a burglary.',
     requiredClueIds: ['clue_n1_safe_deposit', 'clue_n1_missing_master_key'],
     isFallacy: true,
+    classification: 'unproven_assumption',
     refutedByClueId: 'clue_n2_bailment_3b',
     conclusionText:
-      'WARNING — MISLEADING ASSUMPTION: Relying only on Night 1 observations frames Julian Vance, ignoring that he transferred the authentic violin to 3B for safekeeping before the Night 2 blackout.',
+      'CIRCUMSTANTIAL INTERPRETATION: Relying only on Night 1 observations frames Julian Vance, ignoring whether the authentic violin was moved to safekeeping before the Night 2 blackout.',
   },
   {
     id: 'hyp_coerced_blackout_access',
     title: 'Coerced Access: Marcus Blackmailed Nora for the 4A Key & Blackout',
     claim:
-      'Auditor Marcus Thorne (2C) used yellow audit extortion notes to force Superintendent Nora Lin (1A) into handing over the 4A master key and pulling the 4th-floor breaker at 01:25 AM.',
+      'Auditor Marcus Thorne (2C) used yellow audit extortion notes to force Superintendent Nora Lin (1A) into surrendering the 4A master key and pulling the 4th-floor breaker at 01:25 AM.',
     requiredClueIds: ['clue_n1_extortion_note_1a', 'clue_n2_breaker_sabotage_1a'],
     isFallacy: false,
+    classification: 'confirmed_synthesis',
     conclusionText:
-      'VERIFIED LINK: Nora Lin did not act out of malice; Marcus Thorne leveraged clinic records to force her to disable 4A’s lights and surrender the master key.',
+      'CONFIRMED DEDUCTION: Nora Lin acted under extortion duress; the yellow audit demand and her maintenance log entry prove Marcus engineered the 01:25 AM blackout.',
   },
   {
     id: 'hyp_marcus_executed_heist',
     title: 'The 01:25 AM Heist: Marcus Burglarized 4A & Hid the Case in 2C',
     claim:
-      'During the Night 2 blackout, Marcus Thorne entered 4A with the stolen master key, took the crimson violin case, and concealed it behind the false wall vent in 2C alongside his Pier 14 smuggling manifest.',
+      'During the Night 2 blackout, Marcus Thorne stole the crimson violin case from 4A and concealed it behind the false wall vent in 2C for export on his Pier 14 smuggling manifest.',
     requiredClueIds: ['clue_n1_forged_manifest_2c', 'clue_n2_vent_stash_2c'],
     isFallacy: false,
+    classification: 'confirmed_synthesis',
     conclusionText:
-      'VERIFIED LINK: Physical possession and smuggling intent converge on Apt 2C. Marcus Thorne is both the burglar and the exporter.',
+      'CONFIRMED DEDUCTION: Physical possession in the 2C wall cavity and the Pier 14 customs manifest establish Marcus Thorne as both burglar and smuggler.',
   },
   {
     id: 'hyp_julian_elena_counter_sting',
@@ -247,8 +302,9 @@ export const DEDUCTION_HYPOTHESES: DeductionHypothesis[] = [
       'Julian Vance anticipated the burglary, transferred the real 1714 violin to Elena Rostova’s vault in 3B on Night 2, and left a UV-stamped decoy in the 4A safe that trapped Marcus on Night 3.',
     requiredClueIds: ['clue_n2_bailment_3b', 'clue_n3_uv_decoy_stamp'],
     isFallacy: false,
+    classification: 'confirmed_synthesis',
     conclusionText:
-      'VERIFIED LINK: The 1714 Orpheus violin was never lost. Julian and Elena executed a witnessed counter-sting that caught Marcus red-handed with a marked replica.',
+      'CONFIRMED DEDUCTION: The 1714 Orpheus violin was never lost. Julian and Elena executed a witnessed counter-sting that caught Marcus red-handed with a marked replica.',
   },
 ];
 
@@ -260,36 +316,36 @@ export const ENDINGS: Record<string, EndingDefinition> = {
     outcomeType: 'true_resolution',
     summaryParagraphs: [
       'Your timestamped observation dossier and telephoto evidence are delivered to Elena Rostova and Harbor Precinct detectives at 03:05 AM, thirty minutes before the Pier 14 freighter weighs anchor.',
-      'Confronted with photographs of the false air vent in 2C, the UV-stamped decoy violin, the Pier 14 smuggling manifest, and the charred yellow extortion carbons, suspended auditor Marcus Thorne surrenders without firing a shot.',
-      'Master luthier Julian Vance retrieves the authentic 1714 "Orpheus" violin unharmed from Elena’s archival vault in 3B, while your corroboration of the coerced maintenance log clears paramedic Nora Lin of felony complicity.',
+      'Confronted with photographs of the false air vent in 2C, the UV-stamped decoy violin, the Pier 14 smuggling manifest, and the coerced breaker log from 1A, suspended auditor Marcus Thorne surrenders without firing a shot.',
+      'Master luthier Julian Vance retrieves the authentic 1714 "Orpheus" violin unharmed from Elena’s archival vault in 3B, while your corroboration of the yellow extortion note clears paramedic Nora Lin of felony complicity.',
     ],
     epilogueNote:
       'Across Mercer Courtyard, the rain finally slackens at dawn. In Apartment 4A, the warm tungsten workbench lamp stays lit as Julian draws a bow across the restored strings.',
   },
   ending_scapegoat_julian: {
     id: 'ending_scapegoat_julian',
-    title: 'THE RUSHED INDICTMENT // WRONGFUL ARREST IN 4A',
-    verdictSubtitle: 'COMPROMISED ENDING — MISLEADING ASSUMPTION SUBMITTED',
+    title: 'THE PARTIAL INDICTMENT // COMPROMISED VERDICT',
+    verdictSubtitle: 'PARTIAL RESOLUTION — INCOMPLETE CHAIN OR UNREFUTED ASSUMPTION',
     outcomeType: 'partial_truth',
     summaryParagraphs: [
-      'Acting on incomplete Night 1 observations and the unrefuted assumption that Julian Vance staged an inside job, investigators raid Apartment 4A and arrest the master luthier along with Nora Lin.',
-      'Down in Apartment 2C, Marcus Thorne hears the sirens in the courtyard, abandons the UV-marked decoy in the air shaft, and slips out the rear service alley before his Pier 14 manifest is ever connected to the break-in.',
-      'Though Elena Rostova eventually produces the bailment receipt from 3B weeks later, the true mastermind has already vanished across the Atlantic.',
+      'Your submitted dossier captures fragments of the midnight activity at 412 Mercer Street, but lacks the complete three-part evidentiary chain connecting the coerced 1A blackout, the 2C vent stash, and the 3B bailment counter-sting.',
+      'Acting on circumstantial or incomplete links, precinct investigators detain suspects for questioning while Marcus Thorne’s legal counsel challenges the chain of custody on the Pier 14 export manifest.',
+      'Though Elena Rostova eventually produces the authentic 1714 violin from her 3B vault days later, the true mastermind slips through the gaps of an incomplete reconstruction.',
     ],
     epilogueNote:
-      'Looking at a window is not the same as understanding what lies behind it. The truth was visible across Nights 2 and 3—waiting for a steadier lens.',
+      'Looking through a rain-streaked window reveals fragments; only cross-referencing every floor across all three nights exposes the whole design.',
   },
   ending_failure_cold_case: {
     id: 'ending_failure_cold_case',
     title: '03:00 AM DEPARTURE // THE COLD COURTYARD',
-    verdictSubtitle: 'FAILURE OUTCOME — INSUFFICIENT CORROBORATED DEDUCTIONS',
+    verdictSubtitle: 'FAILURE OUTCOME — UNSUPPORTED VERDICT OR EXHAUSTED WATCH',
     outcomeType: 'failure',
     summaryParagraphs: [
-      'The grandfather clock in the vestibule strikes 03:00 AM on the final night without a corroborated chain of evidence linking the extortion in 1A, the vault transfer in 3B, and the hidden vent in 2C.',
+      'The grandfather clock in the vestibule strikes 03:00 AM without a corroborated chain of verified deductions linking the extortion in 1A, the vault transfer in 3B, and the hidden vent in 2C.',
       'Under cover of the downpour, Marcus Thorne descends the rear iron fire escape carrying his weekender bag, while contradicting accounts between Floor 1 and Floor 4 leave precinct detectives deadlocked.',
       'By morning, the Halcyon Arms shutters its courtyard blinds. The case of the 1714 Orpheus violin dissolves into insurance litigation and unanswered suspicions.',
     ],
     epilogueNote:
-      'Tip: Ensure you zoom in (>2.2x), calibrate optical focus to ~19–20m, observe across all three nights, and link at least two verified hypotheses on the Deduction Board.',
+      'To reconstruct the conspiracy, observe apartments at the key timestamps, calibrate zoom and focus to record physical evidence, and link corroborating pins on the Deduction Board.',
   },
 };

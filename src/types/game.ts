@@ -94,7 +94,14 @@ export interface WorldEventTrigger {
   setsFlags: string[];
   requiredFlags?: string[];
   blockedByFlags?: string[];
-  soundCue: 'thunder' | 'phone_ring' | 'breaker_snap' | 'glass_clink' | 'violin_chord' | 'door_slam';
+  isDecisionPoint?: boolean; // Slows fast-forward to 1x so player never misses key windows
+  soundCue:
+    | 'thunder'
+    | 'phone_ring'
+    | 'breaker_snap'
+    | 'glass_clink'
+    | 'violin_chord'
+    | 'door_slam';
 }
 
 export type InterventionId =
@@ -107,6 +114,9 @@ export interface InterventionDefinition {
   label: string;
   shortCode: string;
   description: string;
+  tradeoffWarning: string;
+  alertnessCost: number; // Raises courtyard alertness / consumes cover budget
+  prerequisiteClueId?: string; // Optional or contextual discovery condition
   targetApartmentId: ApartmentId;
   allowedNights: NightNumber[];
   minMinute: number;
@@ -115,6 +125,8 @@ export interface InterventionDefinition {
   setsFlag: string;
   consequenceDescription: string;
 }
+
+export type EvidenceConfidence = 'confirmed' | 'ambiguous' | 'circumstantial';
 
 export interface ClueDefinition {
   id: string;
@@ -130,6 +142,10 @@ export interface ClueDefinition {
   blockedByFlags?: string[];
   isMisleadingAssumption?: boolean;
   contradictedByClueId?: string;
+  confidence: EvidenceConfidence;
+  witnessOrObject: string;
+  relatedClueIds: string[];
+  opticalHintPrompt: string; // Non-spoiler diegetic prompt shown when zooming in before capture
   description: string;
   deductionTag: string;
   localOffset: [number, number, number]; // Offset inside apartment for 3D reticle marker
@@ -142,12 +158,18 @@ export interface CollectedClueRecord {
   formattedTimestamp: string;
 }
 
+export type HypothesisClassification =
+  | 'confirmed_synthesis'
+  | 'unproven_assumption'
+  | 'contradicted_fallacy';
+
 export interface DeductionHypothesis {
   id: string;
   title: string;
   claim: string;
   requiredClueIds: [string, string]; // Pair of clues linked on the deduction board
   isFallacy: boolean;
+  classification: HypothesisClassification;
   refutedByClueId?: string;
   conclusionText: string;
 }

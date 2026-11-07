@@ -30,6 +30,18 @@ export const DeductionBoard: React.FC = () => {
   const collectedIds = new Set(collectedClues.map((c) => c.clueId));
   const collectedDefs = MYSTERY_CLUES.filter((c) => collectedIds.has(c.id));
 
+  // Only reveal hypotheses that are ALREADY synthesized by the player,
+  // OR where the player has genuinely collected BOTH required evidence pins!
+  const unlockedHyps = DEDUCTION_HYPOTHESES.filter((h) =>
+    unlockedHypothesisIds.includes(h.id)
+  );
+  const readyToLinkHyps = DEDUCTION_HYPOTHESES.filter(
+    (h) =>
+      !unlockedHypothesisIds.includes(h.id) &&
+      collectedIds.has(h.requiredClueIds[0]) &&
+      collectedIds.has(h.requiredClueIds[1])
+  );
+
   const handleClueClick = (clueId: string) => {
     if (!selectedBoardClueId) {
       selectBoardClue(clueId);
@@ -45,76 +57,76 @@ export const DeductionBoard: React.FC = () => {
   return (
     <div
       data-testid="deduction-board-modal"
-      className="pointer-events-auto fixed inset-0 z-30 bg-[#04070d]/90 backdrop-blur-xl flex items-center justify-center p-6"
+      className="pointer-events-auto fixed inset-0 z-30 bg-[#04070d]/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-6"
     >
-      <div className="w-full max-w-5xl h-[84vh] bg-[#070d19] border border-slate-700/80 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-5xl h-[84vh] bg-[#070d19] border border-slate-800 rounded-lg shadow-2xl flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950/70">
           <div>
-            <span className="font-mono text-[10px] tracking-[0.25em] text-teal-400 uppercase">
-              CASE RECONSTRUCTION // THE 1714 ORPHEUS VIOLIN
+            <span className="font-mono text-[10px] tracking-[0.22em] text-teal-400 uppercase">
+              INVESTIGATION WORKSPACE
             </span>
-            <h2 className="font-serif text-lg font-semibold text-slate-100 flex items-center gap-2">
-              <GitBranch className="w-5 h-5 text-teal-400" />
+            <h2 className="font-serif text-base md:text-lg font-semibold text-slate-100 flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-teal-400" />
               DEDUCTION & HYPOTHESIS BOARD
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               data-testid="submit-verdict-btn"
               onClick={() => submitFinalVerdict()}
-              className="flex items-center gap-2 px-4 py-2 rounded font-mono text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg transition"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded font-mono text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg transition"
             >
-              <FileCheck2 className="w-4 h-4" />
-              <span>SUBMIT INVESTIGATION VERDICT</span>
+              <FileCheck2 className="w-3.5 h-3.5" />
+              <span>SUBMIT VERDICT</span>
             </button>
 
             <button
               data-testid="close-deduction-btn"
               onClick={() => setGameplayMode('observing')}
               className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800"
+              title="Close [ESC]"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Feedback Banner */}
-        <div className="px-6 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
-          <span className="text-slate-300">
+        {/* Status Bar */}
+        <div className="px-5 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+          <span className="text-slate-300 truncate pr-4">
             {selectedBoardClueId
-              ? `SELECTED PIN: [${
+              ? `PIN SELECTED: [${
                   MYSTERY_CLUES.find((c) => c.id === selectedBoardClueId)?.deductionTag
-                }] — Click a second related clue pin to link them.`
+                }] — Click a second corroborating pin to test connection.`
               : lastDeductionFeedback ||
-                'Select any two corroborating evidence pins below to synthesize a deduction hypothesis.'}
+                'Click any two recorded evidence pins to connect observations into a hypothesis.'}
           </span>
-          <span className="text-teal-400">
-            VERIFIED LINKS:{' '}
+          <span className="text-teal-400 shrink-0">
+            CONFIRMED LINKS:{' '}
             {
               unlockedHypothesisIds.filter(
                 (id) => !DEDUCTION_HYPOTHESES.find((h) => h.id === id)?.isFallacy
               ).length
-            }{' '}
-            / 3
+            }
           </span>
         </div>
 
-        {/* Main Two-Column Board */}
+        {/* Main Workspace */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* Left Column: Collected Evidence Pins */}
-          <div className="lg:col-span-6 p-5 overflow-y-auto border-r border-slate-800 space-y-3">
-            <h3 className="font-mono text-xs tracking-wider text-amber-400 uppercase mb-2">
-              1. COLLECTED EVIDENCE PINS ({collectedDefs.length})
+          <div className="lg:col-span-6 p-4 md:p-5 overflow-y-auto border-b lg:border-b-0 lg:border-r border-slate-800 space-y-3">
+            <h3 className="font-mono text-[11px] tracking-wider text-amber-400 uppercase">
+              1. RECORDED EVIDENCE PINS ({collectedDefs.length})
             </h3>
 
             {collectedDefs.length === 0 ? (
-              <div className="p-5 rounded border border-dashed border-slate-700 text-slate-400 text-xs space-y-2">
-                <p>No evidence pins collected yet.</p>
+              <div className="p-5 rounded border border-dashed border-slate-800 text-slate-400 text-xs space-y-2">
+                <p>No evidence pins recorded yet.</p>
                 <p>
-                  Return to courtyard observation or use the Journal surveillance leads to observe
-                  Apartments 4A, 3B, 2C, and 1A.
+                  Observe the apartment windows across Mercer Courtyard, calibrate optical zoom and
+                  focus, and record physical clues first.
                 </p>
               </div>
             ) : (
@@ -122,6 +134,9 @@ export const DeductionBoard: React.FC = () => {
                 {collectedDefs.map((clue) => {
                   const isSelected = selectedBoardClueId === clue.id;
                   const apt = APARTMENTS[clue.apartmentId];
+                  const isRefuted =
+                    clue.contradictedByClueId && collectedIds.has(clue.contradictedByClueId);
+
                   return (
                     <button
                       key={clue.id}
@@ -129,7 +144,9 @@ export const DeductionBoard: React.FC = () => {
                       onClick={() => handleClueClick(clue.id)}
                       className={`text-left p-3 rounded border transition flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-teal-500/25 border-teal-400 ring-2 ring-teal-400/40'
+                          ? 'bg-teal-500/25 border-teal-400 ring-1 ring-teal-400'
+                          : isRefuted
+                          ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-400'
                           : 'bg-slate-900/85 border-slate-800 hover:border-amber-400/60'
                       }`}
                     >
@@ -138,12 +155,12 @@ export const DeductionBoard: React.FC = () => {
                           <span>
                             NIGHT {clue.night} · APT {apt.code}
                           </span>
-                          <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                          <Link2 className="w-3 h-3 text-teal-400" />
                         </div>
                         <div className="font-mono text-xs font-semibold text-slate-100 mb-1">
                           {clue.deductionTag}
                         </div>
-                        <p className="text-[11px] text-slate-400 line-clamp-3">
+                        <p className="text-[11px] text-slate-400 line-clamp-2">
                           {clue.title}
                         </p>
                       </div>
@@ -154,76 +171,96 @@ export const DeductionBoard: React.FC = () => {
             )}
           </div>
 
-          {/* Right Column: Synthesized Hypotheses & Case Logic */}
-          <div className="lg:col-span-6 p-5 overflow-y-auto space-y-3 bg-slate-950/40">
-            <h3 className="font-mono text-xs tracking-wider text-teal-400 uppercase mb-2">
-              2. SYNTHESIZED DEDUCTION HYPOTHESES ({unlockedHypothesisIds.length}/
-              {DEDUCTION_HYPOTHESES.length})
+          {/* Right Column: Synthesized Hypotheses (No Uncollected Spoilers Shown) */}
+          <div className="lg:col-span-6 p-4 md:p-5 overflow-y-auto space-y-3 bg-slate-950/40">
+            <h3 className="font-mono text-[11px] tracking-wider text-teal-400 uppercase">
+              2. SYNTHESIZED HYPOTHESES ({unlockedHyps.length})
             </h3>
 
-            {DEDUCTION_HYPOTHESES.map((hyp) => {
-              const isUnlocked = unlockedHypothesisIds.includes(hyp.id);
+            {/* Corroborating pairs ready to synthesize from already-collected evidence */}
+            {readyToLinkHyps.map((hyp) => {
               const [reqA, reqB] = hyp.requiredClueIds;
               const clueA = MYSTERY_CLUES.find((c) => c.id === reqA);
               const clueB = MYSTERY_CLUES.find((c) => c.id === reqB);
-              const canAutoSynthesize =
-                !isUnlocked && collectedIds.has(reqA) && collectedIds.has(reqB);
+              return (
+                <div
+                  key={hyp.id}
+                  className="p-3 rounded border border-dashed border-teal-500/40 bg-teal-950/15 flex items-center justify-between gap-3"
+                >
+                  <div className="text-xs font-mono text-slate-300">
+                    <span className="text-teal-400 block text-[10px]">
+                      CORROBORATING PINS AVAILABLE:
+                    </span>
+                    <span>
+                      {clueA?.deductionTag} + {clueB?.deductionTag}
+                    </span>
+                  </div>
+                  <button
+                    data-testid={`synthesize-btn-${hyp.id}`}
+                    onClick={() => linkCluesOnBoard(reqA, reqB)}
+                    className="shrink-0 px-2.5 py-1 rounded font-mono text-[10px] bg-teal-500/25 border border-teal-400 text-teal-200 hover:bg-teal-500/40 flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3" /> CONNECT
+                  </button>
+                </div>
+              );
+            })}
+
+            {unlockedHyps.length === 0 && readyToLinkHyps.length === 0 && (
+              <div className="p-5 rounded border border-slate-800/80 bg-slate-900/30 text-xs text-slate-400 space-y-2">
+                <p className="font-mono text-slate-300 text-[11px]">
+                  NO HYPOTHESES SYNTHESIZED YET
+                </p>
+                <p>
+                  Hypotheses are never revealed in advance. Collect corroborating observations
+                  across apartments and link two pins on the left to form a deduction.
+                </p>
+              </div>
+            )}
+
+            {unlockedHyps.map((hyp) => {
+              const isContradicted =
+                hyp.refutedByClueId && collectedIds.has(hyp.refutedByClueId);
 
               return (
                 <div
                   key={hyp.id}
                   data-testid={`hypothesis-card-${hyp.id}`}
                   className={`p-4 rounded border transition ${
-                    isUnlocked
-                      ? hyp.isFallacy
-                        ? 'bg-amber-950/30 border-amber-500/50'
-                        : 'bg-teal-950/30 border-teal-500/50'
-                      : 'bg-slate-900/40 border-slate-800/80 opacity-80'
+                    isContradicted
+                      ? 'bg-rose-950/30 border-rose-500/50'
+                      : hyp.isFallacy
+                      ? 'bg-amber-950/30 border-amber-500/50'
+                      : 'bg-teal-950/30 border-teal-500/50'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="font-mono text-[10px] uppercase tracking-wider flex items-center gap-1.5">
-                      {isUnlocked ? (
-                        hyp.isFallacy ? (
-                          <span className="text-amber-400 flex items-center gap-1">
-                            <AlertOctagon className="w-3.5 h-3.5" /> MISLEADING ASSUMPTION
-                          </span>
-                        ) : (
-                          <span className="text-teal-400 flex items-center gap-1">
-                            <CheckCircle className="w-3.5 h-3.5" /> VERIFIED DEDUCTION
-                          </span>
-                        )
+                      {isContradicted ? (
+                        <span className="text-rose-400 flex items-center gap-1">
+                          <AlertOctagon className="w-3.5 h-3.5" /> CONTRADICTED BY 3B VAULT EVIDENCE
+                        </span>
+                      ) : hyp.isFallacy ? (
+                        <span className="text-amber-400 flex items-center gap-1">
+                          <AlertOctagon className="w-3.5 h-3.5" /> UNPROVEN ASSUMPTION
+                        </span>
                       ) : (
-                        <span className="text-slate-500">UNLINKED HYPOTHESIS</span>
+                        <span className="text-teal-400 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> CONFIRMED SYNTHESIS
+                        </span>
                       )}
                     </span>
-
-                    {canAutoSynthesize && (
-                      <button
-                        data-testid={`synthesize-btn-${hyp.id}`}
-                        onClick={() => linkCluesOnBoard(reqA, reqB)}
-                        className="px-2.5 py-0.5 rounded font-mono text-[10px] bg-teal-500/25 border border-teal-400 text-teal-200 hover:bg-teal-500/40 flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3" /> LINK PINS
-                      </button>
-                    )}
                   </div>
 
                   <h4 className="font-serif text-sm font-semibold text-slate-100 mb-1">
-                    {isUnlocked ? hyp.title : '??? — Requires Corroborating Evidence Pair'}
+                    {hyp.title}
                   </h4>
 
-                  <p className="text-xs text-slate-300 leading-relaxed mb-2">
-                    {isUnlocked
-                      ? hyp.claim
-                      : `Link [${clueA?.deductionTag}] + [${clueB?.deductionTag}]`}
-                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed mb-2">{hyp.claim}</p>
 
-                  {isUnlocked && (
-                    <div className="text-[11px] font-mono text-slate-300 bg-slate-950/80 p-2 rounded border border-slate-800">
-                      {hyp.conclusionText}
-                    </div>
-                  )}
+                  <div className="text-[11px] font-mono text-slate-300 bg-slate-950/80 p-2 rounded border border-slate-800">
+                    {hyp.conclusionText}
+                  </div>
                 </div>
               );
             })}

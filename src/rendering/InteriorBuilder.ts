@@ -430,6 +430,18 @@ export class InteriorBuilder {
         keytagMesh.material = brassMat;
         keytagMesh.parent = keytagProp;
         propMeshes['prop_dropped_keytag'] = keytagProp;
+
+        const burningNotesProp = new TransformNode('prop_burning_extortion_notes', scene);
+        burningNotesProp.parent = roomRoot;
+        const flameGlowMesh = MeshBuilder.CreateSphere(
+          '2C_StoveFlameGlow',
+          { diameter: 0.38, segments: 8 },
+          scene
+        );
+        flameGlowMesh.position.set(1.25, -0.42, 0.55);
+        flameGlowMesh.material = yellowPaperMat;
+        flameGlowMesh.parent = burningNotesProp;
+        propMeshes['prop_burning_extortion_notes'] = burningNotesProp;
       } else if (apt.id === 'apt_1a') {
         const counter = MeshBuilder.CreateBox(
           '1A_KitchenCounter',

@@ -11,7 +11,7 @@ import { useGameStore } from './state/useGameStore';
 
 export const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const { activeSubtitles, subtitlesEnabled } = useGameStore();
+  const { activeSubtitles, subtitlesEnabled, hudHidden } = useGameStore();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -37,27 +37,27 @@ export const App: React.FC = () => {
         className="w-full h-full block outline-none cursor-crosshair"
       />
 
-      {/* Restrained Cinematic Noir Interface */}
+      {/* Compact Cinematic Minimal Interface */}
       <TopTimeBar />
       <OpticsReticle />
       <InterventionPanel />
 
-      {/* Subtitles / Narrative Event Feed */}
-      {subtitlesEnabled && latestSubtitle && (
+      {/* Quiet Diegetic Event / Observation Caption */}
+      {!hudHidden && subtitlesEnabled && latestSubtitle && (
         <div
           data-testid="subtitle-banner"
-          className="pointer-events-none fixed bottom-14 left-1/2 -translate-x-1/2 z-20 max-w-xl w-[90vw] bg-[#04070d]/85 border border-slate-700/70 rounded px-4 py-2 text-center backdrop-blur-md shadow-xl"
+          className="pointer-events-none fixed bottom-14 left-1/2 -translate-x-1/2 z-20 max-w-md w-[88vw] bg-[#04070d]/75 border border-slate-800/70 rounded px-3.5 py-1.5 text-center backdrop-blur-md shadow-lg"
         >
-          <div className="font-mono text-[10px] tracking-widest text-amber-400 uppercase mb-0.5">
+          <div className="font-mono text-[9px] tracking-widest text-amber-400/90 uppercase">
             {latestSubtitle.speakerOrSource}
           </div>
-          <p className="font-serif text-xs md:text-sm text-slate-100 leading-snug">
+          <p className="font-serif text-xs text-slate-200 leading-snug">
             {latestSubtitle.text}
           </p>
         </div>
       )}
 
-      {/* Drawers & Modals */}
+      {/* Drawers & Overlays */}
       <JournalDrawer />
       <DeductionBoard />
       <SettingsModal />

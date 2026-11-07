@@ -1,4 +1,4 @@
-import { createActor, setup } from 'xstate';
+import { assign, createActor, setup } from 'xstate';
 import { EndingId, NightNumber } from '../types/game';
 
 export type GameplayMode =
@@ -11,19 +11,21 @@ export type GameplayMode =
 export interface GameMachineContext {
   night: NightNumber;
   resolvedEndingId: EndingId | null;
+  wasPausedBeforeOverlay: boolean;
 }
 
 export type GameMachineEvent =
-  | { type: 'OPEN_JOURNAL' }
-  | { type: 'OPEN_DEDUCTION' }
-  | { type: 'OPEN_SETTINGS' }
+  | { type: 'OPEN_JOURNAL'; currentlyPaused: boolean }
+  | { type: 'OPEN_DEDUCTION'; currentlyPaused: boolean }
+  | { type: 'OPEN_SETTINGS'; currentlyPaused: boolean }
   | { type: 'RETURN_TO_OBSERVATION' }
   | { type: 'ADVANCE_NIGHT'; night: NightNumber }
   | { type: 'RESOLVE_CASE'; endingId: EndingId }
   | { type: 'RESET_INVESTIGATION' };
 
 /**
- * Explicit Finite-State Machine (XState v5) governing primary gameplay state transitions.
+ * Explicit Finite-State Machine (XState v5) governing primary gameplay state transitions
+ * using immutable `assign` actions.
  */
 export const gameMachine = setup({
   types: {
@@ -36,23 +38,39 @@ export const gameMachine = setup({
   context: {
     night: 1,
     resolvedEndingId: null,
+    wasPausedBeforeOverlay: false,
   },
   states: {
     observing: {
       on: {
-        OPEN_JOURNAL: { target: 'journal_open' },
-        OPEN_DEDUCTION: { target: 'deduction_open' },
-        OPEN_SETTINGS: { target: 'settings_open' },
+        OPEN_JOURNAL: {
+          target: 'journal_open',
+          actions: assign({
+            wasPausedBeforeOverlay: ({ event }) => event.currentlyPaused,
+          }),
+        },
+        OPEN_DEDUCTION: {
+          target: 'deduction_open',
+          actions: assign({
+            wasPausedBeforeOverlay: ({ event }) => event.currentlyPaused,
+          }),
+        },
+        OPEN_SETTINGS: {
+          target: 'settings_open',
+          actions: assign({
+            wasPausedBeforeOverlay: ({ event }) => event.currentlyPaused,
+          }),
+        },
         ADVANCE_NIGHT: {
-          actions: ({ context, event }) => {
-            context.night = event.night;
-          },
+          actions: assign({
+            night: ({ event }) => event.night,
+          }),
         },
         RESOLVE_CASE: {
           target: 'case_resolved',
-          actions: ({ context, event }) => {
-            context.resolvedEndingId = event.endingId;
-          },
+          actions: assign({
+            resolvedEndingId: ({ event }) => event.endingId,
+          }),
         },
       },
     },
@@ -70,9 +88,9 @@ export const gameMachine = setup({
         OPEN_SETTINGS: { target: 'settings_open' },
         RESOLVE_CASE: {
           target: 'case_resolved',
-          actions: ({ context, event }) => {
-            context.resolvedEndingId = event.endingId;
-          },
+          actions: assign({
+            resolvedEndingId: ({ event }) => event.endingId,
+          }),
         },
       },
     },
@@ -88,10 +106,11 @@ export const gameMachine = setup({
         RETURN_TO_OBSERVATION: { target: 'observing' },
         RESET_INVESTIGATION: {
           target: 'observing',
-          actions: ({ context }) => {
-            context.night = 1;
-            context.resolvedEndingId = null;
-          },
+          actions: assign({
+            night: () => 1 as NightNumber,
+            resolvedEndingId: () => null,
+            wasPausedBeforeOverlay: () => false,
+          }),
         },
       },
     },

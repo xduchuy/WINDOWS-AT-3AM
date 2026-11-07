@@ -1,299 +1,298 @@
-import React from 'react';
-import { Crosshair, Eye, Focus, Sparkles, ZoomIn } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Compass,
+  Crosshair,
+  Eye,
+  Focus,
+  Minimize2,
+  Sliders,
+  ZoomIn,
+} from 'lucide-react';
 import { soundscape } from '../audio/SoundscapeEngine';
 import { APARTMENT_LIST, APARTMENTS } from '../data/apartments';
-import { RESIDENTS } from '../data/residents';
 import { SimulationEngine } from '../simulation/SimulationEngine';
 import { useGameStore } from '../state/useGameStore';
 import { ApartmentId } from '../types/game';
 
 export const OpticsReticle: React.FC = () => {
   const {
+    night,
+    minute,
+    hudHidden,
     focusedApartmentId,
     hoveredApartmentId,
     zoomLevel,
     focalDistance,
     autoFocusEnabled,
-    residents,
+    isLineOfSightClear,
     apartments,
+    worldFlags,
     visibleClues,
     collectedClues,
     scanProgress,
+    lastOpticalRejection,
     focusApartment,
     setZoomLevel,
     setFocalDistance,
     toggleAutoFocus,
+    setHoldingRecord,
     collectClueImmediate,
   } = useGameStore();
 
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
+  const [isOpticsExpanded, setIsOpticsExpanded] = useState(false);
+
+  if (hudHidden) return null;
+
   const activeAptId = focusedApartmentId || hoveredApartmentId;
   const activeAptDef = activeAptId ? APARTMENTS[activeAptId] : null;
-  const activeSimApt = activeAptId ? apartments[activeAptId] : null;
 
   const collectedSet = new Set(collectedClues.map((c) => c.clueId));
   const uncollectedClueInApt = visibleClues.find(
     (c) => c.apartmentId === focusedApartmentId && !collectedSet.has(c.id)
   );
 
-  const opticalCheck = uncollectedClueInApt
-    ? SimulationEngine.checkClueOpticalConditions(
-        uncollectedClueInApt,
+  const validation = uncollectedClueInApt
+    ? SimulationEngine.validateEvidenceCollection(uncollectedClueInApt, {
+        night,
+        minute,
         focusedApartmentId,
-        zoomLevel,
-        focalDistance
-      )
+        currentZoom: zoomLevel,
+        currentFocalDistance: focalDistance,
+        worldFlags: new Set(worldFlags),
+        apartments,
+        isLineOfSightClear,
+      })
     : null;
 
-  // Occupants inside the currently inspected apartment
-  const occupantStates = activeSimApt
-    ? activeSimApt.occupants.map((rId) => residents[rId]).filter(Boolean)
-    : [];
+  // Only show contextual observation prompt when zoomed in (>= 1.6x) on a focused apartment
+  const showContextualReticleFeedback =
+    Boolean(focusedApartmentId) && zoomLevel >= 1.6 && Boolean(uncollectedClueInApt);
 
   return (
     <>
-      {/* Subtle Optical Viewfinder Corner Brackets */}
+      {/* Quiet Viewfinder Center Reticle & Contextual Observation Prompt */}
       <div className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center">
-        <div className="relative w-[86vw] h-[76vh] border border-slate-400/10 rounded-sm">
-          <div className="absolute -top-px -left-px w-5 h-5 border-t-2 border-l-2 border-amber-400/50" />
-          <div className="absolute -top-px -right-px w-5 h-5 border-t-2 border-r-2 border-amber-400/50" />
-          <div className="absolute -bottom-px -left-px w-5 h-5 border-b-2 border-l-2 border-amber-400/50" />
-          <div className="absolute -bottom-px -right-px w-5 h-5 border-b-2 border-r-2 border-amber-400/50" />
+        <div className="relative flex flex-col items-center">
+          <Crosshair
+            className={`w-5 h-5 transition-all duration-300 ${
+              validation?.canScan
+                ? 'text-teal-400 scale-125'
+                : showContextualReticleFeedback
+                ? 'text-amber-400/80'
+                : 'text-slate-400/20'
+            }`}
+          />
 
-          {/* Center Crosshair Pip */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
-            <Crosshair
-              className={`w-6 h-6 transition-all duration-300 ${
-                opticalCheck?.canScan
-                  ? 'text-teal-400 scale-125'
-                  : uncollectedClueInApt
-                  ? 'text-amber-400'
-                  : 'text-slate-400/25'
-              }`}
-            />
-          </div>
+          {/* Subtle Contextual Observation Lock Near Reticle (No Premature Spoilers) */}
+          {showContextualReticleFeedback && uncollectedClueInApt && (
+            <div
+              data-testid="active-clue-scanner"
+              className="pointer-events-auto mt-6 flex flex-col items-center bg-[#04070d]/85 border border-slate-800/90 rounded px-3 py-1.5 backdrop-blur-md shadow-lg max-w-xs text-center"
+            >
+              <span className="font-mono text-[10px] tracking-wider text-slate-300">
+                {validation?.canScan
+                  ? 'OPTICAL LOCK ACQUIRED'
+                  : uncollectedClueInApt.opticalHintPrompt}
+              </span>
+
+              {scanProgress > 0 && (
+                <div className="w-36 h-1 bg-slate-900 rounded overflow-hidden mt-1">
+                  <div
+                    className="h-full bg-teal-400 transition-all duration-100"
+                    style={{ width: `${scanProgress}%` }}
+                  />
+                </div>
+              )}
+
+              {validation?.canScan ? (
+                <button
+                  data-testid="record-evidence-btn"
+                  onMouseDown={() => setHoldingRecord(true)}
+                  onMouseUp={() => setHoldingRecord(false)}
+                  onClick={() => {
+                    soundscape.init();
+                    const res = collectClueImmediate(uncollectedClueInApt.id);
+                    if (res.ok) {
+                      soundscape.playCue('scan_lock');
+                    }
+                  }}
+                  className="mt-1.5 px-2.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-teal-500/25 hover:bg-teal-500/40 text-teal-200 border border-teal-400/50 flex items-center gap-1 transition"
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>RECORD OBSERVATION [R]</span>
+                </button>
+              ) : (
+                <span className="font-mono text-[9px] text-amber-400/90 mt-0.5">
+                  {validation?.reason}
+                </span>
+              )}
+            </div>
+          )}
+
+          {lastOpticalRejection && !showContextualReticleFeedback && (
+            <div
+              data-testid="optical-rejection-toast"
+              className="mt-4 px-2.5 py-1 rounded bg-rose-950/80 border border-rose-500/40 font-mono text-[10px] text-rose-200"
+            >
+              {lastOpticalRejection}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Left Floating Compact Window Selector Matrix (All 12 Windows across 4 Floors) */}
+      {/* Collapsible Window Navigator (Default Collapsed) */}
       <aside
-        aria-label="Building Window Matrix"
-        className="pointer-events-auto fixed left-4 top-20 z-20 bg-[#050912]/85 border border-slate-800/80 rounded-md p-2.5 backdrop-blur-md w-48"
+        aria-label="Window Navigator"
+        className="pointer-events-auto fixed left-3 top-14 z-20"
       >
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-mono text-[10px] tracking-widest text-slate-400 uppercase">
-            WINDOW OPTICS (12)
+        <button
+          data-testid="toggle-window-nav-btn"
+          onClick={() => setIsNavExpanded((v) => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono border backdrop-blur-md transition ${
+            isNavExpanded
+              ? 'bg-slate-900/90 border-amber-400/60 text-amber-200'
+              : 'bg-[#04070d]/75 border-slate-800/80 text-slate-300 hover:border-slate-600'
+          }`}
+          title="Toggle Window Navigator (or click 3D windows directly)"
+        >
+          <Compass className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[10px]">WINDOWS</span>
+        </button>
+
+        {isNavExpanded && (
+          <div
+            data-testid="window-nav-popover"
+            className="mt-1.5 p-2 rounded bg-[#050912]/90 border border-slate-800/90 backdrop-blur-md shadow-xl w-40"
+          >
+            <div className="grid grid-cols-3 gap-1">
+              {APARTMENT_LIST.map((apt) => {
+                const sim = apartments[apt.id];
+                const isFocused = focusedApartmentId === apt.id;
+                return (
+                  <button
+                    key={apt.id}
+                    data-testid={`window-select-${apt.code}`}
+                    onClick={() => {
+                      soundscape.init();
+                      focusApartment(apt.id as ApartmentId);
+                    }}
+                    className={`flex items-center justify-center gap-1 py-1 px-1 rounded text-[10px] font-mono border transition ${
+                      isFocused
+                        ? 'bg-amber-500/30 border-amber-400 text-amber-200 font-semibold'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-600'
+                    }`}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{
+                        backgroundColor: sim?.lightOn ? apt.themeColorHex : '#334155',
+                      }}
+                    />
+                    <span>{apt.code}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </aside>
+
+      {/* Compact Bottom-Center Optical Readout & Minimal Apartment Status */}
+      <div className="pointer-events-auto fixed bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5">
+        {isOpticsExpanded && (
+          <div
+            data-testid="optics-sliders-popover"
+            className="flex items-center gap-4 bg-[#050912]/90 border border-slate-800/90 rounded px-3.5 py-2 backdrop-blur-md shadow-xl"
+          >
+            <div className="flex items-center gap-2">
+              <ZoomIn className="w-3.5 h-3.5 text-amber-400" />
+              <input
+                type="range"
+                aria-label="Optical zoom level"
+                data-testid="zoom-slider"
+                min={1.0}
+                max={3.5}
+                step={0.1}
+                value={zoomLevel}
+                onChange={(e) => setZoomLevel(Number(e.target.value))}
+                className="w-24 h-1 accent-amber-400 bg-slate-800 rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Focus className="w-3.5 h-3.5 text-teal-400" />
+              <input
+                type="range"
+                aria-label="Optical focal distance"
+                data-testid="focus-slider"
+                min={8.0}
+                max={24.0}
+                step={0.2}
+                value={focalDistance}
+                onChange={(e) => setFocalDistance(Number(e.target.value))}
+                className="w-24 h-1 accent-teal-400 bg-slate-800 rounded cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
+        <div
+          data-testid="apartment-telemetry-card"
+          className="h-9 flex items-center gap-3 bg-[#04070d]/80 border border-slate-800/80 rounded-full px-4 backdrop-blur-md text-xs font-mono shadow-lg"
+        >
+          {/* Minimal Apartment Code & Observation Status */}
+          <span className="text-amber-300 font-semibold tracking-wider text-[11px]">
+            {activeAptDef ? `APT ${activeAptDef.code}` : 'COURTYARD'}
           </span>
+
+          <div className="h-3 w-px bg-slate-800" />
+
+          <span className="text-slate-300 text-[11px]" data-testid="zoom-readout">
+            {zoomLevel.toFixed(1)}x
+          </span>
+
+          <span className="text-slate-400 text-[11px]" data-testid="focus-readout">
+            {focalDistance.toFixed(1)}m
+          </span>
+
+          <button
+            data-testid="autofocus-btn"
+            onClick={toggleAutoFocus}
+            className={`px-1.5 py-0.5 rounded text-[10px] border transition ${
+              autoFocusEnabled
+                ? 'bg-teal-500/25 border-teal-400 text-teal-300'
+                : 'border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Auto-Focus [F]"
+          >
+            AF
+          </button>
+
+          <button
+            data-testid="toggle-optics-sliders-btn"
+            onClick={() => setIsOpticsExpanded((v) => !v)}
+            className={`p-1 rounded transition ${
+              isOpticsExpanded ? 'text-amber-300' : 'text-slate-400 hover:text-white'
+            }`}
+            title="Toggle Manual Optics Sliders"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+          </button>
+
           {focusedApartmentId && (
             <button
               data-testid="reset-overview-btn"
               onClick={() => focusApartment(null)}
-              className="font-mono text-[10px] text-amber-400 hover:underline"
+              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-amber-300 transition"
+              title="Wide View [ESC]"
             >
-              WIDE [ESC]
+              <Minimize2 className="w-3 h-3" />
+              <span className="hidden sm:inline">WIDE</span>
             </button>
           )}
         </div>
-
-        <div className="grid grid-cols-3 gap-1">
-          {APARTMENT_LIST.map((apt) => {
-            const sim = apartments[apt.id];
-            const isFocused = focusedApartmentId === apt.id;
-            const hasClueNow = visibleClues.some(
-              (c) => c.apartmentId === apt.id && !collectedSet.has(c.id)
-            );
-
-            return (
-              <button
-                key={apt.id}
-                data-testid={`window-select-${apt.code}`}
-                onClick={() => {
-                  soundscape.init();
-                  focusApartment(apt.id as ApartmentId);
-                }}
-                className={`relative flex flex-col items-center py-1 px-1 rounded text-[11px] font-mono border transition ${
-                  isFocused
-                    ? 'bg-amber-500/30 border-amber-400 text-amber-200 font-bold'
-                    : apt.isDetailedInteractive
-                    ? 'bg-slate-900/90 border-slate-700 text-slate-200 hover:border-amber-400/60'
-                    : 'bg-slate-950/60 border-slate-800/70 text-slate-500 hover:text-slate-300'
-                }`}
-                title={`${apt.code}: ${apt.name}`}
-              >
-                <div className="flex items-center gap-1">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{
-                      backgroundColor: sim?.lightOn ? apt.themeColorHex : '#334155',
-                    }}
-                  />
-                  <span>{apt.code}</span>
-                </div>
-                {apt.residentId && (
-                  <span className="text-[8px] text-slate-400 truncate max-w-full">
-                    {RESIDENTS[apt.residentId].fullName.split(' ')[0]}
-                  </span>
-                )}
-                {hasClueNow && (
-                  <span
-                    data-testid={`clue-ping-${apt.code}`}
-                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-teal-400 animate-ping"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Optical Zoom & Manual/Auto Focus Controls */}
-        <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-2">
-          <div>
-            <div className="flex justify-between text-[10px] font-mono text-slate-300 mb-0.5">
-              <span className="flex items-center gap-1">
-                <ZoomIn className="w-3 h-3 text-amber-400" /> ZOOM
-              </span>
-              <span data-testid="zoom-readout">{zoomLevel.toFixed(1)}x</span>
-            </div>
-            <input
-              type="range"
-              aria-label="Optical zoom level"
-              data-testid="zoom-slider"
-              min={1.0}
-              max={3.5}
-              step={0.1}
-              value={zoomLevel}
-              onChange={(e) => setZoomLevel(Number(e.target.value))}
-              className="w-full h-1 accent-amber-400 bg-slate-800 rounded cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center text-[10px] font-mono text-slate-300 mb-0.5">
-              <span className="flex items-center gap-1">
-                <Focus className="w-3 h-3 text-teal-400" /> FOCUS
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span data-testid="focus-readout">{focalDistance.toFixed(1)}m</span>
-                <button
-                  data-testid="autofocus-btn"
-                  onClick={toggleAutoFocus}
-                  className={`px-1 py-0.2 rounded text-[9px] border ${
-                    autoFocusEnabled
-                      ? 'bg-teal-500/25 border-teal-400 text-teal-300'
-                      : 'border-slate-700 text-slate-400'
-                  }`}
-                >
-                  AF
-                </button>
-              </div>
-            </div>
-            <input
-              type="range"
-              aria-label="Optical focal distance"
-              data-testid="focus-slider"
-              min={8.0}
-              max={24.0}
-              step={0.2}
-              value={focalDistance}
-              onChange={(e) => setFocalDistance(Number(e.target.value))}
-              className="w-full h-1 accent-teal-400 bg-slate-800 rounded cursor-pointer"
-            />
-          </div>
-        </div>
-      </aside>
-
-      {/* Right-Bottom Telephoto Inspection & Evidence Acquisition Readout */}
-      {activeAptDef && (
-        <div
-          data-testid="apartment-telemetry-card"
-          className="pointer-events-auto fixed right-4 bottom-16 z-20 w-80 bg-[#050912]/90 border border-slate-800/90 rounded-md p-3.5 backdrop-blur-md shadow-2xl"
-        >
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2">
-            <div>
-              <span className="font-mono text-[10px] text-amber-400 uppercase tracking-widest">
-                APT {activeAptDef.code} // FLOOR {activeAptDef.floor}
-              </span>
-              <h2 className="font-serif text-sm font-semibold text-slate-100">
-                {activeAptDef.name}
-              </h2>
-            </div>
-            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-              {activeAptDef.focalDepthMeters.toFixed(1)}m
-            </span>
-          </div>
-
-          {occupantStates.length > 0 ? (
-            <div className="space-y-2 mb-2.5">
-              {occupantStates.map((occ) => (
-                <div
-                  key={occ.residentId}
-                  className="bg-slate-900/75 border border-slate-800/90 rounded p-2 text-xs"
-                >
-                  <div className="flex items-center justify-between font-mono text-[11px] text-amber-300 mb-0.5">
-                    <span>{occ.fullName}</span>
-                    <span className="text-[9px] text-slate-400 uppercase">
-                      {occ.posture.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <p className="text-slate-200 font-medium text-[11px] leading-snug">
-                    {occ.actionSummary}
-                  </p>
-                  {zoomLevel >= 1.8 && (
-                    <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
-                      {occ.observableDetail}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-400 text-xs mb-2.5 leading-relaxed">
-              {activeAptDef.description}
-            </p>
-          )}
-
-          {/* Evidence Scan Calibration Status */}
-          {uncollectedClueInApt && (
-            <div
-              data-testid="active-clue-scanner"
-              className="mt-2 pt-2 border-t border-slate-800/90"
-            >
-              <div className="flex items-center justify-between text-[11px] font-mono mb-1">
-                <span className="flex items-center gap-1 text-teal-300">
-                  <Sparkles className="w-3.5 h-3.5" /> DISCOVERABLE EVIDENCE
-                </span>
-                <span className="text-slate-400">{Math.round(scanProgress)}%</span>
-              </div>
-
-              <div className="w-full h-1.5 bg-slate-900 rounded overflow-hidden mb-1.5">
-                <div
-                  className="h-full bg-teal-400 transition-all duration-150"
-                  style={{ width: `${scanProgress}%` }}
-                />
-              </div>
-
-              <p className="font-mono text-[10px] text-amber-300/95 mb-2">
-                {opticalCheck?.reason}
-              </p>
-
-              {/* Direct Record Button when optical lock is achieved or calibrated */}
-              <button
-                data-testid="record-evidence-btn"
-                onClick={() => {
-                  // Calibrate optics automatically and record the observed clue
-                  setZoomLevel(Math.max(zoomLevel, uncollectedClueInApt.minZoomLevel + 0.1));
-                  setFocalDistance(uncollectedClueInApt.targetFocalDistance);
-                  soundscape.playCue('scan_lock');
-                  collectClueImmediate(uncollectedClueInApt.id);
-                }}
-                className="w-full py-1.5 px-2.5 rounded font-mono text-[11px] font-semibold bg-teal-500/20 hover:bg-teal-500/35 text-teal-200 border border-teal-400/50 flex items-center justify-center gap-1.5 transition"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>FOCUS & LOG OBSERVATION</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      </div>
     </>
   );
 };

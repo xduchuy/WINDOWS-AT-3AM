@@ -3,8 +3,8 @@ import path from 'node:path';
 
 const SCREENSHOT_DIR = path.resolve(process.cwd(), 'docs/screenshots');
 
-test.describe('WINDOWS AT 3AM — Playable Vertical Slice E2E Verification', () => {
-  test('launches exterior scene, zooms into apartments, triggers intervention, collects clues, links deductions, and reaches True Ending', async ({
+test.describe('WINDOWS AT 3AM — Upgraded Investigation Loop & Cinematic Minimal HUD E2E', () => {
+  test('completes full 3-night investigation through natural observation, focus calibration, interventions, and deduction without debug shortcuts', async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -12,21 +12,34 @@ test.describe('WINDOWS AT 3AM — Playable Vertical Slice E2E Verification', () 
 
     await page.goto('/');
 
-    // 1. Verify 3D canvas & cinematic HUD load cleanly
+    // 1. Verify launch, 3D canvas initialization, and compact minimal HUD (window nav & interventions collapsed by default)
     const canvas = page.getByTestId('observation-canvas');
     await expect(canvas).toBeVisible();
     await expect(page.getByTestId('world-clock-display')).toBeVisible();
+    await expect(page.getByTestId('active-night-indicator')).toHaveText('NIGHT 1');
+    await expect(page.getByTestId('window-nav-popover')).toHaveCount(0);
+    await expect(page.getByTestId('intervention-tray')).toHaveCount(0);
 
-    // Wait briefly for 3D scene & rain particles to render initial frames
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1500);
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, '01-exterior-courtyard-wide.png'),
     });
 
-    // 2. Focus on Apartment 1A (Nora Lin) on Night 1 and record the Yellow Audit Extortion Note clue
+    // 2. Test Cinematic Mode [H] toggle hides and restores HUD cleanly
+    await page.keyboard.press('h');
+    await expect(page.getByTestId('exit-cinematic-mode-btn')).toBeVisible();
+    await page.keyboard.press('h');
+    await expect(page.getByTestId('world-clock-display')).toBeVisible();
+
+    // 3. Night 1 Observation #1: Focus Apt 1A (via keyboard '4' or collapsible window nav), calibrate focus [F], and record clue
+    await page.getByTestId('toggle-window-nav-btn').click();
+    await expect(page.getByTestId('window-nav-popover')).toBeVisible();
     await page.getByTestId('window-select-1A').click();
     await expect(page.getByTestId('apartment-telemetry-card')).toContainText('APT 1A');
-    await page.waitForTimeout(600);
+
+    // Press 'f' to engage Auto-Focus (~20.1m) and record observation
+    await page.keyboard.press('f');
+    await page.waitForTimeout(500);
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, '02-interior-apt-1a-zoom.png'),
     });
@@ -34,47 +47,82 @@ test.describe('WINDOWS AT 3AM — Playable Vertical Slice E2E Verification', () 
     await page.getByTestId('record-evidence-btn').click();
     await expect(page.getByTestId('clue-count-badge')).toHaveText('1');
 
-    // 3. Focus on Apartment 2C (Marcus Thorne) on Night 1 and record the Pier 14 Manifest clue
+    // 4. Night 1 Observation #2: Focus Apt 2C (Marcus Thorne) and record Pier 14 Smuggling Manifest
     await page.getByTestId('window-select-2C').click();
+    await page.waitForTimeout(300);
     await page.getByTestId('record-evidence-btn').click();
     await expect(page.getByTestId('clue-count-badge')).toHaveText('2');
 
-    // 4. Scrub to 01:20 AM (80m) on Night 1 and deploy Courtyard Payphone Intervention
-    const scrubber = page.getByTestId('timeline-scrubber');
-    await scrubber.fill('80');
-    await scrubber.dispatchEvent('change');
-    await page.getByTestId('intervention-btn-ring_courtyard_payphone').click();
-    await page.waitForTimeout(400);
+    // 5. With 2 observations recorded on Night 1, the natural "END WATCH" button appears to progress to Night 2!
+    const advanceBtn = page.getByTestId('advance-night-btn');
+    await expect(advanceBtn).toBeVisible();
+    await advanceBtn.click();
+    await expect(page.getByTestId('active-night-indicator')).toHaveText('NIGHT 2');
 
-    // 5. Switch to Night 2, scrub to 01:30 AM (90m) during the 4A Blackout, and collect clues in 1A, 3B, and 2C
-    await page.getByTestId('night-btn-2').click();
-    await scrubber.fill('90');
-    await scrubber.dispatchEvent('change');
+    // 6. Night 2 Progression: Use pace selector (5x) to let clock run naturally to 01:25 AM (minute 85)
+    // Decision-point events at 01:16 AM (76m) and 01:25 AM (85m) will automatically drop speed back to 1x!
+    await page.getByTestId('speed-popover-btn').click();
+    await page.getByTestId('speed-btn-5x').click();
 
-    // Record 1A Forced Breaker Sabotage clue
-    await page.getByTestId('window-select-1A').click();
-    await page.getByTestId('record-evidence-btn').click();
+    // Wait until Night 2 reaches at least 01:16 AM (when Julian visits Elena in 3B)
+    await expect(async () => {
+      const clockText = await page.getByTestId('world-clock-display').innerText();
+      expect(clockText >= '01:16 AM').toBe(true);
+    }).toPass({ timeout: 15000 });
 
-    // Record 3B Signed Bailment Transfer of Authentic Violin
+    // Focus Apt 3B (Elena Rostova's Study) and record the Signed Bailment Transfer
     await page.getByTestId('window-select-3B').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, '03-interior-apt-3b-study.png'),
     });
     await page.getByTestId('record-evidence-btn').click();
+    await expect(page.getByTestId('clue-count-badge')).toHaveText('3');
 
-    // Scrub to 02:20 AM (140m) on Night 2 and record 2C Hidden Case in Wall Vent
-    await scrubber.fill('140');
-    await scrubber.dispatchEvent('change');
-    await page.getByTestId('window-select-2C').click();
+    // Speed up to 01:25 AM blackout window and record 1A Coerced Breaker Cut
+    await page.getByTestId('speed-popover-btn').click();
+    await page.getByTestId('speed-btn-5x').click();
+    await expect(async () => {
+      const clockText = await page.getByTestId('world-clock-display').innerText();
+      expect(clockText >= '01:25 AM').toBe(true);
+    }).toPass({ timeout: 10000 });
+
+    await page.getByTestId('window-select-1A').click();
+    await page.waitForTimeout(300);
     await page.getByTestId('record-evidence-btn').click();
+    await expect(page.getByTestId('clue-count-badge')).toHaveText('4');
 
-    // 6. Switch to Night 3, focus on 2C, and record UV Decoy Stamp clue
-    await page.getByTestId('night-btn-3').click();
+    // Speed up to 02:10 AM (130m) when power is restored and Marcus stashes the case in 2C's wall vent
+    await page.getByTestId('speed-popover-btn').click();
+    await page.getByTestId('speed-btn-5x').click();
+    await expect(async () => {
+      const clockText = await page.getByTestId('world-clock-display').innerText();
+      expect(clockText >= '02:11 AM').toBe(true);
+    }).toPass({ timeout: 12000 });
+
+    // Also test Night 2 Contextual Intervention: Flash Optical Signal to 3B (now unlocked because we collected clue_n2_bailment_3b!)
+    await page.getByTestId('toggle-interventions-btn').click();
+    await expect(page.getByTestId('intervention-tray')).toBeVisible();
+    await page.getByTestId('intervention-btn-laser_window_tap_3b').click();
+    await page.getByTestId('toggle-interventions-btn').click();
+
+    // Focus 2C and record Stolen Case Hidden in Wall Vent
     await page.getByTestId('window-select-2C').click();
+    await page.waitForTimeout(300);
     await page.getByTestId('record-evidence-btn').click();
+    await expect(page.getByTestId('clue-count-badge')).toHaveText('5');
 
-    // 7. Open Observation Journal to verify timestamped entries
+    // Conclude Night 2 Watch naturally to advance to Night 3
+    await page.getByTestId('advance-night-btn').click();
+    await expect(page.getByTestId('active-night-indicator')).toHaveText('NIGHT 3');
+
+    // 7. Night 3 Observation: Focus 2C and record UV Decoy Stamp clue
+    await page.getByTestId('window-select-2C').click();
+    await page.waitForTimeout(300);
+    await page.getByTestId('record-evidence-btn').click();
+    await expect(page.getByTestId('clue-count-badge')).toHaveText('6');
+
+    // 8. Open Observation Journal to verify forensic metadata & cross-references
     await page.getByTestId('open-journal-btn').click();
     await expect(page.getByTestId('journal-drawer')).toBeVisible();
     await page.screenshot({
@@ -82,7 +130,7 @@ test.describe('WINDOWS AT 3AM — Playable Vertical Slice E2E Verification', () 
     });
     await page.getByTestId('close-journal-btn').click();
 
-    // 8. Open Deduction Board, synthesize the 3 verified hypotheses, and submit final verdict
+    // 9. Open Deduction Board, connect corroborating pins, and submit final verdict
     await page.getByTestId('open-deduction-btn').click();
     await expect(page.getByTestId('deduction-board-modal')).toBeVisible();
 
@@ -97,11 +145,19 @@ test.describe('WINDOWS AT 3AM — Playable Vertical Slice E2E Verification', () 
 
     await page.getByTestId('submit-verdict-btn').click();
 
-    // 9. Verify True Conspiracy Resolution Ending screen
+    // 10. Verify True Conspiracy Resolution Ending screen
     await expect(page.getByTestId('ending-resolution-modal')).toBeVisible();
     await expect(page.getByTestId('ending-title')).toContainText('THE ORPHEUS COUNTER-STING');
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, '06-true-ending-resolution.png'),
+    });
+
+    // 11. Verify responsive layout at 1366x768 desktop & 1024x768 tablet landscape
+    await page.getByTestId('ending-continue-observing-btn').click();
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '07-responsive-1366x768.png'),
     });
 
     expect(errors).toEqual([]);
